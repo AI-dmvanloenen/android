@@ -37,9 +37,9 @@ class CustomerRepositoryImpl @Inject constructor(
     }
     
     /**
-     * Get a single customer by ID
+     * Get a single customer by ID (Odoo record ID)
      */
-    override suspend fun getCustomerById(customerId: String): Customer? {
+    override suspend fun getCustomerById(customerId: Int): Customer? {
         return customerDao.getCustomerById(customerId)?.toDomain()
     }
     

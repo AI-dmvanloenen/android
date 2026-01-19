@@ -14,18 +14,18 @@ private val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.US)
 
 /**
  * Convert CustomerResponse from API to domain Customer model
+ * Uses odooId as the primary identifier to prevent duplicates on sync
  */
 fun CustomerResponse.toDomain(): Customer {
     return Customer(
-        id = UUID.randomUUID().toString(),  // Generate local ID
-        cradleUid = cradleUid,
+        id = odooId ?: 0,  // Use Odoo record ID directly (prevents duplicates)
         name = name,
         city = city,
         taxId = taxId,
         email = email,
         phone = phone,
         website = website,
-        date = date?.let { 
+        date = date?.let {
             try {
                 dateFormatter.parse(it)
             } catch (e: Exception) {
@@ -33,8 +33,7 @@ fun CustomerResponse.toDomain(): Customer {
             }
         },
         syncState = SyncState.SYNCED,  // Data from Odoo is already synced
-        lastModified = Date(),
-        odooId = odooId
+        lastModified = Date()
     )
 }
 
@@ -43,7 +42,6 @@ fun CustomerResponse.toDomain(): Customer {
  */
 fun Customer.toRequest(): CustomerRequest {
     return CustomerRequest(
-        cradleUid = cradleUid,
         name = name,
         city = city,
         taxId = taxId,

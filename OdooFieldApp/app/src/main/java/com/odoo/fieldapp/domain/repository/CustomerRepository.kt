@@ -19,9 +19,9 @@ interface CustomerRepository {
     fun getCustomers(): Flow<List<Customer>>
     
     /**
-     * Get a single customer by ID from local database
+     * Get a single customer by ID (Odoo record ID) from local database
      */
-    suspend fun getCustomerById(customerId: String): Customer?
+    suspend fun getCustomerById(customerId: Int): Customer?
     
     /**
      * Search customers by name

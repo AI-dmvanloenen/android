@@ -90,9 +90,9 @@ class CustomerViewModel @Inject constructor(
     }
     
     /**
-     * Load customer by ID
+     * Load customer by ID (Odoo record ID)
      */
-    fun loadCustomerById(customerId: String) {
+    fun loadCustomerById(customerId: Int) {
         viewModelScope.launch {
             val customer = customerRepository.getCustomerById(customerId)
             _selectedCustomer.value = customer

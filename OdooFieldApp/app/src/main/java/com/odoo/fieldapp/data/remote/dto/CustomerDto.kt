@@ -7,9 +7,6 @@ import com.google.gson.annotations.SerializedName
  * Matches the structure returned by Odoo API
  */
 data class CustomerResponse(
-    @SerializedName("cradle_uid")
-    val cradleUid: String,
-    
     @SerializedName("name")
     val name: String,
     
@@ -40,9 +37,6 @@ data class CustomerResponse(
  * Matches the structure expected by Odoo API
  */
 data class CustomerRequest(
-    @SerializedName("cradle_uid")
-    val cradleUid: String,
-    
     @SerializedName("name")
     val name: String,
     

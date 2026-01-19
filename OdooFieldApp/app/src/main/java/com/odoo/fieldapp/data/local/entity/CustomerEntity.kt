@@ -9,21 +9,19 @@ import java.util.Date
 
 /**
  * Room entity for Customer table
- * 
- * Indices on cradleUid and name for fast lookups
- * Unique constraint on cradleUid to prevent duplicates
+ *
+ * Uses Odoo record ID as primary key to prevent duplicates on sync
+ * Index on name for fast lookups
  */
 @Entity(
     tableName = "customers",
     indices = [
-        Index(value = ["cradleUid"], unique = true),
         Index(value = ["name"])
     ]
 )
 data class CustomerEntity(
     @PrimaryKey
-    val id: String,
-    val cradleUid: String,
+    val id: Int,                  // Odoo record ID (prevents duplicates)
     val name: String,
     val city: String?,
     val taxId: String?,
@@ -32,8 +30,7 @@ data class CustomerEntity(
     val website: String?,
     val date: Long?,              // Stored as timestamp
     val syncState: String,        // Stored as String (SYNCED, PENDING, etc.)
-    val lastModified: Long,       // Stored as timestamp
-    val odooId: Int?
+    val lastModified: Long        // Stored as timestamp
 )
 
 /**
@@ -42,7 +39,6 @@ data class CustomerEntity(
 fun CustomerEntity.toDomain(): Customer {
     return Customer(
         id = id,
-        cradleUid = cradleUid,
         name = name,
         city = city,
         taxId = taxId,
@@ -51,8 +47,7 @@ fun CustomerEntity.toDomain(): Customer {
         website = website,
         date = date?.let { Date(it) },
         syncState = SyncState.valueOf(syncState),
-        lastModified = Date(lastModified),
-        odooId = odooId
+        lastModified = Date(lastModified)
     )
 }
 
@@ -62,7 +57,6 @@ fun CustomerEntity.toDomain(): Customer {
 fun Customer.toEntity(): CustomerEntity {
     return CustomerEntity(
         id = id,
-        cradleUid = cradleUid,
         name = name,
         city = city,
         taxId = taxId,
@@ -71,7 +65,6 @@ fun Customer.toEntity(): CustomerEntity {
         website = website,
         date = date?.time,
         syncState = syncState.name,
-        lastModified = lastModified.time,
-        odooId = odooId
+        lastModified = lastModified.time
     )
 }

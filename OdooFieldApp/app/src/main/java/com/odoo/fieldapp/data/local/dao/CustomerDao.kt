@@ -20,16 +20,10 @@ interface CustomerDao {
     fun getAllCustomers(): Flow<List<CustomerEntity>>
     
     /**
-     * Get a single customer by ID
+     * Get a single customer by ID (Odoo record ID)
      */
     @Query("SELECT * FROM customers WHERE id = :customerId")
-    suspend fun getCustomerById(customerId: String): CustomerEntity?
-    
-    /**
-     * Get a customer by cradleUid (useful for sync operations)
-     */
-    @Query("SELECT * FROM customers WHERE cradleUid = :cradleUid")
-    suspend fun getCustomerByCradleUid(cradleUid: String): CustomerEntity?
+    suspend fun getCustomerById(customerId: Int): CustomerEntity?
     
     /**
      * Search customers by name

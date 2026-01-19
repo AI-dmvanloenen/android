@@ -159,24 +159,16 @@ fun CustomerDetailScreen(
                             )
                         }
                         
-                        customer.odooId?.let { odooId ->
-                            DetailRow(
-                                icon = Icons.Default.Info,
-                                label = "Odoo ID",
-                                value = odooId.toString()
-                            )
-                        }
+                        DetailRow(
+                            icon = Icons.Default.Info,
+                            label = "Odoo ID",
+                            value = customer.id.toString()
+                        )
                         
                         DetailRow(
                             icon = Icons.Default.Sync,
                             label = "Sync Status",
                             value = customer.syncState.name
-                        )
-                        
-                        DetailRow(
-                            icon = Icons.Default.Fingerprint,
-                            label = "Cradle UID",
-                            value = customer.cradleUid.take(8) + "..."
                         )
                     }
                 }

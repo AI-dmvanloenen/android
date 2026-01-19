@@ -203,7 +203,6 @@ curl -X GET https://moko.odoo.com/customer \
 [
   {
     "id": 42,
-    "cradle_uid": "123e4567-e89b-12d3-a456-426614174000",
     "name": "Advance Insight",
     "city": "Nairobi",
     "tax_id": "P800000447",
@@ -221,7 +220,7 @@ Create new customers
 curl -X POST https://moko.odoo.com/customer \
   -H "Content-Type: application/json" \
   -H "Authorization: YOUR_API_KEY" \
-  -d '[{"cradle_uid": "...", "name": "...", ...}]'
+  -d '[{"name": "...", ...}]'
 ```
 
 ## Future Enhancements (Roadmap)

@@ -2,6 +2,7 @@ package com.odoo.fieldapp.data.remote.api
 
 import com.odoo.fieldapp.data.remote.dto.CustomerRequest
 import com.odoo.fieldapp.data.remote.dto.CustomerResponse
+import com.odoo.fieldapp.data.remote.dto.SaleResponse
 import retrofit2.Response
 import retrofit2.http.*
 
@@ -33,22 +34,19 @@ interface OdooApiService {
         @Body customers: List<CustomerRequest>
     ): Response<List<CustomerResponse>>
     
+    /**
+     * Fetch all sales from Odoo
+     * GET /sales
+     */
+    @GET("sales")
+    suspend fun getSales(
+        @Header("Authorization") apiKey: String
+    ): Response<List<SaleResponse>>
+
     // Future endpoints:
-    // @GET("sale")
-    // suspend fun getSales(@Header("Authorization") apiKey: String): Response<List<SaleResponse>>
-    
-    // @POST("sale")
-    // suspend fun createSales(@Header("Authorization") apiKey: String, @Body sales: List<SaleRequest>): Response<List<SaleResponse>>
-    
     // @GET("payment")
     // suspend fun getPayments(@Header("Authorization") apiKey: String): Response<List<PaymentResponse>>
-    
-    // @POST("payment")
-    // suspend fun createPayments(@Header("Authorization") apiKey: String, @Body payments: List<PaymentRequest>): Response<List<PaymentResponse>>
-    
+
     // @GET("delivery")
     // suspend fun getDeliveries(@Header("Authorization") apiKey: String): Response<List<DeliveryResponse>>
-    
-    // @POST("delivery")
-    // suspend fun createDeliveries(@Header("Authorization") apiKey: String, @Body deliveries: List<DeliveryRequest>): Response<List<DeliveryResponse>>
 }

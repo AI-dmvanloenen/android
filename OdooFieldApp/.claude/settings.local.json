@@ -18,7 +18,9 @@
       "Bash(./gradlew clean:*)",
       "Bash(~/Library/Android/sdk/platform-tools/adb install -r /Users/douwe/GitHub/android/OdooFieldApp/app/build/outputs/apk/debug/app-debug.apk)",
       "Bash(shasum:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(/usr/libexec/java_home:*)",
+      "Bash(JAVA_HOME=\"/Applications/Android Studio.app/Contents/jbr/Contents/Home\" ./gradlew:*)"
     ]
   }
 }

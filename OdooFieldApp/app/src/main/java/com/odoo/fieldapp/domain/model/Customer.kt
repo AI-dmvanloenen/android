@@ -7,8 +7,7 @@ import java.util.Date
  * This represents a customer in the business logic layer
  */
 data class Customer(
-    val id: String,              // Local UUID
-    val cradleUid: String,       // Unique ID for Odoo sync
+    val id: Int,                 // Odoo record ID (used as primary key)
     val name: String,
     val city: String?,
     val taxId: String?,
@@ -17,8 +16,7 @@ data class Customer(
     val website: String?,
     val date: Date?,
     val syncState: SyncState,
-    val lastModified: Date,
-    val odooId: Int?             // Odoo record ID (populated after sync)
+    val lastModified: Date
 )
 
 /**

@@ -6,12 +6,15 @@ import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.odoo.fieldapp.data.local.OdooDatabase
 import com.odoo.fieldapp.data.local.dao.CustomerDao
+import com.odoo.fieldapp.data.local.dao.SaleDao
 import com.odoo.fieldapp.data.remote.DynamicBaseUrlInterceptor
 import com.odoo.fieldapp.data.remote.api.OdooApiService
 import com.odoo.fieldapp.data.repository.ApiKeyProvider
 import com.odoo.fieldapp.data.repository.ApiKeyProviderImpl
 import com.odoo.fieldapp.data.repository.CustomerRepositoryImpl
+import com.odoo.fieldapp.data.repository.SaleRepositoryImpl
 import com.odoo.fieldapp.domain.repository.CustomerRepository
+import com.odoo.fieldapp.domain.repository.SaleRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -151,5 +154,27 @@ object AppModule {
         apiKeyProvider: ApiKeyProvider
     ): CustomerRepository {
         return CustomerRepositoryImpl(customerDao, apiService, apiKeyProvider)
+    }
+
+    /**
+     * Provide Sale DAO
+     */
+    @Provides
+    @Singleton
+    fun provideSaleDao(database: OdooDatabase): SaleDao {
+        return database.saleDao()
+    }
+
+    /**
+     * Provide SaleRepository
+     */
+    @Provides
+    @Singleton
+    fun provideSaleRepository(
+        saleDao: SaleDao,
+        apiService: OdooApiService,
+        apiKeyProvider: ApiKeyProvider
+    ): SaleRepository {
+        return SaleRepositoryImpl(saleDao, apiService, apiKeyProvider)
     }
 }
