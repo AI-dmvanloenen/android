@@ -50,18 +50,18 @@
         </field>
     </record>
 
-    <!-- Webhook Tree View -->
-    <record id="view_android_api_webhook_tree" model="ir.ui.view">
-        <field name="name">android.api.webhook.tree</field>
+    <!-- Webhook List View -->
+    <record id="view_android_api_webhook_list" model="ir.ui.view">
+        <field name="name">android.api.webhook.list</field>
         <field name="model">android.api.webhook</field>
         <field name="arch" type="xml">
-            <tree string="Webhooks">
+            <list string="Webhooks">
                 <field name="name"/>
                 <field name="url"/>
                 <field name="active"/>
                 <field name="last_triggered"/>
                 <field name="last_status" decoration-success="last_status == 'success'" decoration-danger="last_status == 'failed'" widget="badge"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -69,7 +69,7 @@
     <record id="action_android_api_webhook" model="ir.actions.act_window">
         <field name="name">Webhooks</field>
         <field name="res_model">android.api.webhook</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">list,form</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 Create a webhook to receive notifications
