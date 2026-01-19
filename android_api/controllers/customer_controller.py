@@ -19,10 +19,11 @@ class CustomerController(http.Controller):
             return Response("Unauthorized", status=401)
 
         try:
-            partners_env = request.env['res.partner'].sudo()
+            partners_env = request.env['res.partner'].sudo().with_context(active_test=False)
             customers = partners_env.search([
+                '|',
                 ('customer_rank', '>', 0),
-                ('active', '=', True),
+                ('sale_order_ids', '!=', False),
             ])
 
             result = []
