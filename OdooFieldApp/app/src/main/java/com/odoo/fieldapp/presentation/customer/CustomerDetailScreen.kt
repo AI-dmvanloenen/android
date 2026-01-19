@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.odoo.fieldapp.domain.model.Customer
+import com.odoo.fieldapp.domain.model.Delivery
 import com.odoo.fieldapp.domain.model.Sale
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
@@ -29,8 +30,10 @@ import java.util.*
 fun CustomerDetailScreen(
     customer: Customer?,
     sales: List<Sale> = emptyList(),
+    deliveries: List<Delivery> = emptyList(),
     onBackClick: () -> Unit,
-    onSaleClick: (Sale) -> Unit = {}
+    onSaleClick: (Sale) -> Unit = {},
+    onDeliveryClick: (Delivery) -> Unit = {}
 ) {
     Scaffold(
         topBar = {
@@ -185,6 +188,12 @@ fun CustomerDetailScreen(
                     sales = sales,
                     onSaleClick = onSaleClick
                 )
+
+                // Deliveries
+                DeliveriesCard(
+                    deliveries = deliveries,
+                    onDeliveryClick = onDeliveryClick
+                )
             }
         }
     }
@@ -298,6 +307,142 @@ private fun SaleOrderItem(
                     text = currencyFormatter.format(amount),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = "View details",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+/**
+ * Deliveries card showing all deliveries for this customer
+ */
+@Composable
+private fun DeliveriesCard(
+    deliveries: List<Delivery>,
+    onDeliveryClick: (Delivery) -> Unit
+) {
+    val dateFormatter = remember { SimpleDateFormat("MMM dd, yyyy", Locale.US) }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Deliveries",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = "${deliveries.size} deliver${if (deliveries.size != 1) "ies" else "y"}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Divider()
+
+            if (deliveries.isEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = "No deliveries",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                deliveries.forEach { delivery ->
+                    DeliveryItem(
+                        delivery = delivery,
+                        dateFormatter = dateFormatter,
+                        onClick = { onDeliveryClick(delivery) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Single delivery item in the list
+ */
+@Composable
+private fun DeliveryItem(
+    delivery: Delivery,
+    dateFormatter: SimpleDateFormat,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = MaterialTheme.shapes.small
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = delivery.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                delivery.scheduledDate?.let { date ->
+                    Text(
+                        text = dateFormatter.format(date),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // State badge
+            Surface(
+                color = when (delivery.state) {
+                    "done" -> MaterialTheme.colorScheme.primaryContainer
+                    "assigned" -> MaterialTheme.colorScheme.tertiaryContainer
+                    "waiting" -> MaterialTheme.colorScheme.secondaryContainer
+                    "cancel" -> MaterialTheme.colorScheme.errorContainer
+                    else -> MaterialTheme.colorScheme.surfaceVariant
+                },
+                shape = MaterialTheme.shapes.small
+            ) {
+                Text(
+                    text = delivery.state.replaceFirstChar { it.uppercase() },
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    color = when (delivery.state) {
+                        "done" -> MaterialTheme.colorScheme.onPrimaryContainer
+                        "assigned" -> MaterialTheme.colorScheme.onTertiaryContainer
+                        "waiting" -> MaterialTheme.colorScheme.onSecondaryContainer
+                        "cancel" -> MaterialTheme.colorScheme.onErrorContainer
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }
                 )
             }
 

@@ -93,7 +93,8 @@ class SaleRepositoryImpl @Inject constructor(
             val response = apiService.getSales(apiKey)
 
             if (response.isSuccessful) {
-                val saleResponses = response.body() ?: emptyList()
+                val paginatedResponse = response.body()
+                val saleResponses = paginatedResponse?.data ?: emptyList()
 
                 // 4. Filter out records with null IDs (prevents primary key conflicts)
                 val validResponses = saleResponses.filter { it.id != null }

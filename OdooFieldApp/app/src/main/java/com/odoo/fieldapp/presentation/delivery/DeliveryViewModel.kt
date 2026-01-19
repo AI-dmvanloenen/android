@@ -33,6 +33,10 @@ class DeliveryViewModel @Inject constructor(
     private val _syncState = MutableStateFlow<Resource<List<Delivery>>?>(null)
     val syncState: StateFlow<Resource<List<Delivery>>?> = _syncState.asStateFlow()
 
+    // Validation state
+    private val _validateState = MutableStateFlow<Resource<Delivery>?>(null)
+    val validateState: StateFlow<Resource<Delivery>?> = _validateState.asStateFlow()
+
     // Deliveries list (filtered by search query)
     val deliveries: StateFlow<List<Delivery>> = searchQuery
         .debounce(300)  // Wait 300ms after user stops typing
@@ -115,5 +119,32 @@ class DeliveryViewModel @Inject constructor(
      */
     fun clearSyncState() {
         _syncState.value = null
+    }
+
+    /**
+     * Validate the selected delivery (mark as done)
+     */
+    fun validateDelivery() {
+        val delivery = _selectedDelivery.value ?: return
+
+        viewModelScope.launch {
+            deliveryRepository.validateDelivery(delivery.id)
+                .collect { resource ->
+                    _validateState.value = resource
+
+                    // Update selected delivery on success
+                    if (resource is Resource.Success) {
+                        _selectedDelivery.value = resource.data
+                        _deliveryLines.value = resource.data?.lines ?: emptyList()
+                    }
+                }
+        }
+    }
+
+    /**
+     * Clear validation state (dismiss success/error messages)
+     */
+    fun clearValidateState() {
+        _validateState.value = null
     }
 }

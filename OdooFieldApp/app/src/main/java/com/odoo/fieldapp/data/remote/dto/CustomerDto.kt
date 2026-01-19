@@ -71,10 +71,27 @@ data class CustomerRequest(
 data class OdooApiResponse<T>(
     @SerializedName("success")
     val success: Boolean,
-    
+
     @SerializedName("data")
     val data: T?,
-    
+
     @SerializedName("error")
     val error: String?
+)
+
+/**
+ * Paginated response wrapper for customers endpoint
+ */
+data class CustomerPaginatedResponse(
+    @SerializedName("data")
+    val data: List<CustomerResponse>,
+
+    @SerializedName("total")
+    val total: Int,
+
+    @SerializedName("limit")
+    val limit: Int,
+
+    @SerializedName("offset")
+    val offset: Int
 )

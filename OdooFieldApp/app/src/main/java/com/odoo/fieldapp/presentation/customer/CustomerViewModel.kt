@@ -3,10 +3,12 @@ package com.odoo.fieldapp.presentation.customer
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.odoo.fieldapp.domain.model.Customer
+import com.odoo.fieldapp.domain.model.Delivery
 import com.odoo.fieldapp.domain.model.Resource
 import com.odoo.fieldapp.domain.model.Sale
 import com.odoo.fieldapp.domain.model.SyncState
 import com.odoo.fieldapp.domain.repository.CustomerRepository
+import com.odoo.fieldapp.domain.repository.DeliveryRepository
 import com.odoo.fieldapp.domain.repository.SaleRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -26,7 +28,8 @@ import javax.inject.Inject
 @HiltViewModel
 class CustomerViewModel @Inject constructor(
     private val customerRepository: CustomerRepository,
-    private val saleRepository: SaleRepository
+    private val saleRepository: SaleRepository,
+    private val deliveryRepository: DeliveryRepository
 ) : ViewModel() {
     
     // Search query
@@ -89,6 +92,21 @@ class CustomerViewModel @Inject constructor(
         .flatMapLatest { customer ->
             if (customer != null) {
                 saleRepository.getSalesByCustomer(customer.id)
+            } else {
+                flowOf(emptyList())
+            }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    // Deliveries for the selected customer
+    val deliveriesForCustomer: StateFlow<List<Delivery>> = _selectedCustomer
+        .flatMapLatest { customer ->
+            if (customer != null) {
+                deliveryRepository.getDeliveriesByCustomer(customer.id)
             } else {
                 flowOf(emptyList())
             }

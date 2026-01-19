@@ -7,13 +7,63 @@ import logging
 
 from .auth import (
     api_authenticate, json_error, json_response, validate_required_fields,
-    validate_foreign_key, check_rate_limit, format_date, parse_datetime
+    validate_foreign_key, check_rate_limit, format_date, parse_datetime,
+    get_pagination_params, get_filter_params, build_domain, paginated_response,
+    format_datetime
 )
 
 _logger = logging.getLogger(__name__)
 
+# Allowed filters for GET endpoint
+PAYMENT_FILTERS = {
+    'partner_id': ('partner_id', 'int'),
+    'state': ('state', 'str'),
+    'since': ('write_date', 'datetime'),  # Records modified since
+}
+
 
 class PaymentController(http.Controller):
+
+    @http.route('/payments', type='http', auth='none', methods=['GET'], cors='*', csrf=False)
+    def get_payments(self):
+        # Rate limiting
+        allowed, error = check_rate_limit()
+        if not allowed:
+            return error
+
+        if not api_authenticate():
+            return json_error("Unauthorized", status=401)
+
+        try:
+            limit, offset = get_pagination_params()
+            filters = get_filter_params(PAYMENT_FILTERS)
+
+            payments_env = request.env['account.payment'].sudo()
+
+            # Base domain - only inbound customer payments
+            domain = [('payment_type', '=', 'inbound'), ('partner_type', '=', 'customer')]
+
+            # Apply filters
+            if filters:
+                # Handle 'since' filter specially (>=)
+                if 'write_date' in filters:
+                    domain.append(('write_date', '>=', filters.pop('write_date')))
+                domain = build_domain(domain, filters)
+
+            # Get total count for pagination
+            total = payments_env.search_count(domain)
+
+            # Get paginated results
+            payments = payments_env.search(domain, limit=limit, offset=offset, order='id')
+
+            result = [self.__payment_to_dict(payment) for payment in payments]
+
+            _logger.info(f'GET /payments - Returned {len(result)} of {total} payments')
+            return paginated_response(result, total, limit, offset)
+
+        except Exception as exp:
+            _logger.exception('API exception')
+            return json_error("Internal server error", status=500, details=str(exp))
 
     @http.route('/payments', type='http', auth='none', methods=['POST'], cors='*', csrf=False)
     def create_payments(self):
@@ -89,6 +139,7 @@ class PaymentController(http.Controller):
             'memo': payment.ref or '',
             'journal_id': payment.journal_id.id if payment.journal_id else None,
             'state': payment.state or '',
+            'write_date': format_datetime(payment.write_date) if payment.write_date else None,
         }
 
     def __dict_to_payment_vals(self, data):

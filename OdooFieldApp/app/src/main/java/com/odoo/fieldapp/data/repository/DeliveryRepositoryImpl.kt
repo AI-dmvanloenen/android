@@ -8,6 +8,7 @@ import com.odoo.fieldapp.data.local.dao.SaleDao
 import com.odoo.fieldapp.data.local.entity.toDomain
 import com.odoo.fieldapp.data.local.entity.toEntity
 import com.odoo.fieldapp.data.remote.api.OdooApiService
+import com.odoo.fieldapp.data.remote.dto.ValidateDeliveryRequest
 import com.odoo.fieldapp.data.remote.mapper.toDomain
 import com.odoo.fieldapp.domain.model.Delivery
 import com.odoo.fieldapp.domain.model.DeliveryLine
@@ -133,7 +134,8 @@ class DeliveryRepositoryImpl @Inject constructor(
             val response = apiService.getDeliveries(apiKey)
 
             if (response.isSuccessful) {
-                val deliveryResponses = response.body() ?: emptyList()
+                val paginatedResponse = response.body()
+                val deliveryResponses = paginatedResponse?.data ?: emptyList()
 
                 // 4. Filter out records with null IDs (prevents primary key conflicts)
                 val validResponses = deliveryResponses.filter { it.id != null }
@@ -191,6 +193,96 @@ class DeliveryRepositoryImpl @Inject constructor(
                     "Request timed out. Please try again."
                 else ->
                     "Sync failed: ${e.message ?: "Unknown error"}"
+            }
+            emit(Resource.Error(errorMessage))
+        }
+    }
+
+    /**
+     * Validate a delivery (mark as done) in Odoo
+     *
+     * Flow:
+     * 1. Emit Loading
+     * 2. Call API to validate delivery
+     * 3. On success: Update local database with new state
+     * 4. Emit Success with updated delivery
+     * 5. On failure: Emit Error with message
+     */
+    override suspend fun validateDelivery(deliveryId: Int): Flow<Resource<Delivery>> = flow {
+        try {
+            // 1. Emit loading
+            emit(Resource.Loading())
+
+            // 2. Get API key
+            val apiKey = apiKeyProvider.getApiKey()
+            if (apiKey.isNullOrBlank()) {
+                emit(Resource.Error("API key not configured. Please add your API key in settings."))
+                return@flow
+            }
+
+            // 3. Call API to validate delivery
+            val request = ValidateDeliveryRequest(id = deliveryId)
+            val response = apiService.validateDelivery(apiKey, request)
+
+            if (response.isSuccessful) {
+                val validateResponse = response.body()
+
+                // Check for error in response body (API returns error in body, not HTTP status)
+                if (validateResponse?.error != null) {
+                    emit(Resource.Error(validateResponse.error))
+                    return@flow
+                }
+
+                if (validateResponse?.success == true && validateResponse.delivery != null) {
+                    // 4. Convert response to domain model
+                    val updatedDelivery = validateResponse.delivery.toDomain()
+
+                    // 5. Resolve partner name and sale name from local database
+                    val partnerName = updatedDelivery.partnerId?.let { customerId ->
+                        customerDao.getCustomerById(customerId)?.name
+                    }
+                    val saleName = updatedDelivery.saleId?.let { saleId ->
+                        saleDao.getSaleById(saleId)?.name
+                    }
+                    val enrichedDelivery = updatedDelivery.copy(
+                        partnerName = partnerName,
+                        saleName = saleName
+                    )
+
+                    // 6. Update local database
+                    deliveryDao.insertDelivery(enrichedDelivery.toEntity())
+
+                    // 7. Update delivery lines
+                    val lineEntities = enrichedDelivery.lines.map { it.toEntity(deliveryId) }
+                    deliveryLineDao.syncLinesForDelivery(deliveryId, lineEntities)
+
+                    Log.d(TAG, "Delivery $deliveryId validated successfully, new state: ${enrichedDelivery.state}")
+                    emit(Resource.Success(enrichedDelivery))
+                } else {
+                    emit(Resource.Error("Validation failed: unexpected response"))
+                }
+            } else {
+                // HTTP error
+                val errorMessage = when (response.code()) {
+                    401 -> "Authentication failed. Please check your API key."
+                    403 -> "Access denied. Your API key doesn't have permission."
+                    404 -> "Delivery not found."
+                    500 -> "Odoo server error. Please try again later."
+                    else -> "Validation failed: ${response.message()}"
+                }
+                emit(Resource.Error(errorMessage))
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Delivery validation failed", e)
+
+            val errorMessage = when {
+                e.message?.contains("Unable to resolve host") == true ->
+                    "Network error. Please check your internet connection."
+                e.message?.contains("timeout") == true ->
+                    "Request timed out. Please try again."
+                else ->
+                    "Validation failed: ${e.message ?: "Unknown error"}"
             }
             emit(Resource.Error(errorMessage))
         }

@@ -45,3 +45,46 @@ data class DeliveryResponse(
     @SerializedName("lines")
     val lines: List<DeliveryLineResponse>?
 )
+
+/**
+ * Paginated response wrapper for deliveries endpoint
+ */
+data class DeliveryPaginatedResponse(
+    @SerializedName("data")
+    val data: List<DeliveryResponse>,
+
+    @SerializedName("total")
+    val total: Int,
+
+    @SerializedName("limit")
+    val limit: Int,
+
+    @SerializedName("offset")
+    val offset: Int
+)
+
+/**
+ * Request payload for validating a delivery (marking as done)
+ */
+data class ValidateDeliveryRequest(
+    @SerializedName("id")
+    val id: Int
+)
+
+/**
+ * Response from delivery validation endpoint
+ * Can contain either success with delivery data or error
+ */
+data class ValidateDeliveryResponse(
+    @SerializedName("success")
+    val success: Boolean?,
+
+    @SerializedName("delivery")
+    val delivery: DeliveryResponse?,
+
+    @SerializedName("error")
+    val error: String?,
+
+    @SerializedName("status")
+    val status: Int?
+)

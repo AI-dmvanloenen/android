@@ -39,3 +39,20 @@ data class SaleRequest(
     @SerializedName("partner_id")
     val partnerId: Int?
 )
+
+/**
+ * Paginated response wrapper for sales endpoint
+ */
+data class SalePaginatedResponse(
+    @SerializedName("data")
+    val data: List<SaleResponse>,
+
+    @SerializedName("total")
+    val total: Int,
+
+    @SerializedName("limit")
+    val limit: Int,
+
+    @SerializedName("offset")
+    val offset: Int
+)

@@ -87,7 +87,8 @@ class CustomerRepositoryImpl @Inject constructor(
             val response = apiService.getCustomers(apiKey)
 
             if (response.isSuccessful) {
-                val customerResponses = response.body() ?: emptyList()
+                val paginatedResponse = response.body()
+                val customerResponses = paginatedResponse?.data ?: emptyList()
 
                 // 4. Filter out records with null IDs (prevents primary key conflicts)
                 val validResponses = customerResponses.filter { it.odooId != null }

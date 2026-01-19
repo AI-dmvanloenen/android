@@ -1,9 +1,12 @@
 package com.odoo.fieldapp.data.remote.api
 
+import com.odoo.fieldapp.data.remote.dto.CustomerPaginatedResponse
 import com.odoo.fieldapp.data.remote.dto.CustomerRequest
 import com.odoo.fieldapp.data.remote.dto.CustomerResponse
-import com.odoo.fieldapp.data.remote.dto.DeliveryResponse
-import com.odoo.fieldapp.data.remote.dto.SaleResponse
+import com.odoo.fieldapp.data.remote.dto.DeliveryPaginatedResponse
+import com.odoo.fieldapp.data.remote.dto.SalePaginatedResponse
+import com.odoo.fieldapp.data.remote.dto.ValidateDeliveryRequest
+import com.odoo.fieldapp.data.remote.dto.ValidateDeliveryResponse
 import retrofit2.Response
 import retrofit2.http.*
 
@@ -17,11 +20,12 @@ interface OdooApiService {
     /**
      * Fetch all customers from Odoo
      * GET https://moko.odoo.com/customer
+     * Returns paginated response wrapper
      */
     @GET("customer")
     suspend fun getCustomers(
         @Header("Authorization") apiKey: String
-    ): Response<List<CustomerResponse>>
+    ): Response<CustomerPaginatedResponse>
     
     /**
      * Create new customers in Odoo (batch operation)
@@ -38,20 +42,34 @@ interface OdooApiService {
     /**
      * Fetch all sales from Odoo
      * GET /sales
+     * Returns paginated response wrapper
      */
     @GET("sales")
     suspend fun getSales(
         @Header("Authorization") apiKey: String
-    ): Response<List<SaleResponse>>
+    ): Response<SalePaginatedResponse>
 
     /**
      * Fetch all deliveries from Odoo
      * GET /deliveries
+     * Returns paginated response wrapper
      */
     @GET("deliveries")
     suspend fun getDeliveries(
         @Header("Authorization") apiKey: String
-    ): Response<List<DeliveryResponse>>
+    ): Response<DeliveryPaginatedResponse>
+
+    /**
+     * Validate a delivery (mark as done)
+     * POST /deliveries
+     *
+     * Sets quantities done to match demand and validates the picking
+     */
+    @POST("deliveries")
+    suspend fun validateDelivery(
+        @Header("Authorization") apiKey: String,
+        @Body request: ValidateDeliveryRequest
+    ): Response<ValidateDeliveryResponse>
 
     // Future endpoints:
     // @GET("payment")

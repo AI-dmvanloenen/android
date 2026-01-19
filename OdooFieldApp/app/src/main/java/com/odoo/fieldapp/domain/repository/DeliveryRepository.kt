@@ -44,4 +44,12 @@ interface DeliveryRepository {
      * @return Resource wrapper with loading/success/error states
      */
     suspend fun syncDeliveriesFromOdoo(): Flow<Resource<List<Delivery>>>
+
+    /**
+     * Validate a delivery (mark as done) in Odoo
+     *
+     * @param deliveryId The ID of the delivery to validate
+     * @return Resource wrapper with the updated delivery or error
+     */
+    suspend fun validateDelivery(deliveryId: Int): Flow<Resource<Delivery>>
 }

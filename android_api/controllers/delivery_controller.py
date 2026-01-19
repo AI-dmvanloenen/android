@@ -86,3 +86,46 @@ class DeliveryController(http.Controller):
             'write_date': format_datetime(picking.write_date) if picking.write_date else None,
             'lines': lines,
         }
+
+    @http.route('/deliveries', type='json', auth='none', methods=['POST'], cors='*', csrf=False)
+    def update_delivery_status(self):
+        """Update delivery status to 'done'."""
+        # Rate limiting
+        allowed, _ = check_rate_limit()
+        if not allowed:
+            return {'error': 'Rate limit exceeded', 'status': 429}
+
+        if not api_authenticate():
+            return {'error': 'Unauthorized', 'status': 401}
+
+        try:
+            params = request.jsonrequest
+            delivery_id = params.get('id')
+
+            if not delivery_id:
+                return {'error': 'Missing required field: id', 'status': 400}
+
+            picking = request.env['stock.picking'].sudo().browse(delivery_id)
+
+            if not picking.exists():
+                return {'error': f'Delivery {delivery_id} not found', 'status': 404}
+
+            if picking.state == 'done':
+                return {'error': 'Delivery is already done', 'status': 400}
+
+            if picking.state == 'cancel':
+                return {'error': 'Cannot complete a cancelled delivery', 'status': 400}
+
+            # Set quantities done to match demand for all move lines
+            for move in picking.move_ids_without_package:
+                move.quantity = move.product_uom_qty
+
+            # Validate the picking (mark as done)
+            picking.button_validate()
+
+            _logger.info(f'POST /deliveries - Marked delivery {delivery_id} as done')
+            return {'success': True, 'delivery': self.__picking_to_dict(picking)}
+
+        except Exception as exp:
+            _logger.exception('API exception')
+            return {'error': 'Internal server error', 'status': 500, 'details': str(exp)}

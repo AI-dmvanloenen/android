@@ -132,6 +132,7 @@ fun AppNavigation(
             val customerId = backStackEntry.arguments?.getInt("customerId") ?: 0
             val customer by viewModel.selectedCustomer.collectAsState()
             val salesForCustomer by viewModel.salesForCustomer.collectAsState()
+            val deliveriesForCustomer by viewModel.deliveriesForCustomer.collectAsState()
 
             // Load customer when screen opens
             if (customer == null && customerId != 0) {
@@ -141,6 +142,7 @@ fun AppNavigation(
             CustomerDetailScreen(
                 customer = customer,
                 sales = salesForCustomer,
+                deliveries = deliveriesForCustomer,
                 onBackClick = {
                     viewModel.clearSelectedCustomer()
                     navController.popBackStack()
@@ -148,6 +150,11 @@ fun AppNavigation(
                 onSaleClick = { sale ->
                     navController.navigate(
                         Screen.SaleDetail.createRoute(sale.id)
+                    )
+                },
+                onDeliveryClick = { delivery ->
+                    navController.navigate(
+                        Screen.DeliveryDetail.createRoute(delivery.id)
                     )
                 }
             )
@@ -255,6 +262,7 @@ fun AppNavigation(
             val viewModel: DeliveryViewModel = hiltViewModel()
             val deliveryId = backStackEntry.arguments?.getInt("deliveryId") ?: 0
             val delivery by viewModel.selectedDelivery.collectAsState()
+            val validateState by viewModel.validateState.collectAsState()
 
             // Load delivery when screen opens
             if (delivery == null && deliveryId != 0) {
@@ -263,10 +271,14 @@ fun AppNavigation(
 
             DeliveryDetailScreen(
                 delivery = delivery,
+                validateState = validateState,
                 onBackClick = {
                     viewModel.clearSelectedDelivery()
+                    viewModel.clearValidateState()
                     navController.popBackStack()
                 },
+                onValidateClick = viewModel::validateDelivery,
+                onClearValidateState = viewModel::clearValidateState,
                 onCustomerClick = { customerId ->
                     navController.navigate(
                         Screen.CustomerDetail.createRoute(customerId)
