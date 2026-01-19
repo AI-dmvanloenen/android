@@ -118,7 +118,7 @@ object AppModule {
      * Provide Retrofit instance
      *
      * Base URL is dynamically overridden by DynamicBaseUrlInterceptor
-     * based on the database name from settings.
+     * based on the server URL from settings.
      * The placeholder URL here is overwritten at request time.
      */
     @Provides

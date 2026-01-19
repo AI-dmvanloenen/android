@@ -45,14 +45,10 @@ fun CustomerListScreen(
                         onClick = onSyncClick,
                         enabled = syncState !is Resource.Loading
                     ) {
-                        if (syncState is Resource.Loading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Icon(Icons.Default.Refresh, contentDescription = "Sync")
-                        }
+                        Icon(
+                            imageVector = if (syncState is Resource.Loading) Icons.Default.Sync else Icons.Default.Refresh,
+                            contentDescription = "Sync"
+                        )
                     }
                     
                     // Settings button

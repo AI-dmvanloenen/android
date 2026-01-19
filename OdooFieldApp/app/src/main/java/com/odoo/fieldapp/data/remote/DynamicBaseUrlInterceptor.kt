@@ -10,9 +10,9 @@ import javax.inject.Singleton
 
 /**
  * OkHttp Interceptor that dynamically rewrites the base URL
- * based on the database name stored in settings.
+ * based on the server URL stored in settings.
  *
- * URL format: https://[database-name].odoo.com/
+ * Supports any custom server URL (e.g., mycompany.odoo.com, custom.ownserver.com)
  */
 @Singleton
 class DynamicBaseUrlInterceptor @Inject constructor(
@@ -23,7 +23,7 @@ class DynamicBaseUrlInterceptor @Inject constructor(
         val originalRequest = chain.request()
         val originalUrl = originalRequest.url
 
-        // Get the database name from settings (blocking call)
+        // Get the base URL from settings (blocking call)
         val baseUrl = runBlocking { apiKeyProvider.getBaseUrl() }
         val newBaseUrl = baseUrl.toHttpUrlOrNull()
 

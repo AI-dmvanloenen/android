@@ -35,8 +35,8 @@ class SettingsViewModel @Inject constructor(
     private val _apiKey = MutableStateFlow("")
     val apiKey: StateFlow<String> = _apiKey.asStateFlow()
 
-    private val _databaseName = MutableStateFlow("")
-    val databaseName: StateFlow<String> = _databaseName.asStateFlow()
+    private val _serverUrl = MutableStateFlow("")
+    val serverUrl: StateFlow<String> = _serverUrl.asStateFlow()
 
     private val _saveState = MutableStateFlow<SaveState>(SaveState.Idle)
     val saveState: StateFlow<SaveState> = _saveState.asStateFlow()
@@ -50,8 +50,8 @@ class SettingsViewModel @Inject constructor(
             val key = apiKeyProvider.getApiKey()
             _apiKey.value = key ?: ""
 
-            val dbName = apiKeyProvider.getDatabaseName()
-            _databaseName.value = dbName ?: ""
+            val url = apiKeyProvider.getServerUrl()
+            _serverUrl.value = url ?: ""
         }
     }
 
@@ -59,8 +59,8 @@ class SettingsViewModel @Inject constructor(
         _apiKey.value = newKey
     }
 
-    fun onDatabaseNameChange(newName: String) {
-        _databaseName.value = newName
+    fun onServerUrlChange(newUrl: String) {
+        _serverUrl.value = newUrl
     }
 
     fun saveSettings() {
@@ -68,7 +68,7 @@ class SettingsViewModel @Inject constructor(
             _saveState.value = SaveState.Saving
             try {
                 apiKeyProvider.setApiKey(_apiKey.value)
-                apiKeyProvider.setDatabaseName(_databaseName.value)
+                apiKeyProvider.setServerUrl(_serverUrl.value)
                 _saveState.value = SaveState.Success
             } catch (e: Exception) {
                 _saveState.value = SaveState.Error(e.message ?: "Failed to save")
@@ -94,10 +94,10 @@ sealed class SaveState {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    databaseName: String,
+    serverUrl: String,
     apiKey: String,
     saveState: SaveState,
-    onDatabaseNameChange: (String) -> Unit,
+    onServerUrlChange: (String) -> Unit,
     onApiKeyChange: (String) -> Unit,
     onSaveClick: () -> Unit,
     onBackClick: () -> Unit,
@@ -139,23 +139,34 @@ fun SettingsScreen(
                     )
 
                     Text(
-                        text = "Enter your Odoo database name and API key to sync data.",
+                        text = "Enter your Odoo server URL and API key to sync data.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Database name input
+                    // Server URL input
+                    val displayUrl = serverUrl.ifBlank { "mycompany.odoo.com" }
+                    val previewUrl = if (displayUrl.startsWith("http://") || displayUrl.startsWith("https://")) {
+                        displayUrl
+                    } else {
+                        "https://$displayUrl"
+                    }
+                    // Truncate preview URL to prevent layout constraint crashes
+                    val truncatedPreviewUrl = if (previewUrl.length > 50) {
+                        previewUrl.take(47) + "..."
+                    } else {
+                        previewUrl
+                    }
+
                     OutlinedTextField(
-                        value = databaseName,
-                        onValueChange = onDatabaseNameChange,
+                        value = serverUrl,
+                        onValueChange = onServerUrlChange,
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Database Name") },
-                        placeholder = { Text("mycompany") },
-                        supportingText = {
-                            Text("URL will be: https://${databaseName.ifBlank { "mycompany" }}.odoo.com/")
-                        },
+                        label = { Text("Server URL") },
+                        placeholder = { Text("mycompany.odoo.com") },
+                        supportingText = { Text("Will connect to: $truncatedPreviewUrl") },
                         leadingIcon = {
                             Icon(Icons.Default.Cloud, contentDescription = null)
                         },
@@ -205,14 +216,10 @@ fun SettingsScreen(
                     Button(
                         onClick = onSaveClick,
                         modifier = Modifier.fillMaxWidth(),
-                        enabled = databaseName.isNotBlank() && apiKey.isNotBlank() && saveState !is SaveState.Saving
+                        enabled = serverUrl.isNotBlank() && apiKey.isNotBlank() && saveState !is SaveState.Saving
                     ) {
                         if (saveState is SaveState.Saving) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
+                            Icon(Icons.Default.Refresh, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Saving...")
                         } else {

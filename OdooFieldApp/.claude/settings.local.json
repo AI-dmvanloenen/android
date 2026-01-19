@@ -7,7 +7,17 @@
       "Bash(./gradlew assembleDebug:*)",
       "Bash(/Users/douwe/GitHub/OdooFieldApp/gradlew:*)",
       "WebSearch",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(adb devices:*)",
+      "Bash(~/Library/Android/sdk/platform-tools/adb devices)",
+      "Bash(~/Library/Android/sdk/platform-tools/adb logcat -d)",
+      "Bash(~/Library/Android/sdk/platform-tools/adb shell pm clear com.odoo.fieldapp)",
+      "Bash(~/Library/Android/sdk/platform-tools/adb logcat -c)",
+      "Bash(~/Library/Android/sdk/platform-tools/adb uninstall com.odoo.fieldapp)",
+      "Bash(export JAVA_HOME=\"/Applications/Android Studio.app/Contents/jbr/Contents/Home\")",
+      "Bash(./gradlew clean:*)",
+      "Bash(~/Library/Android/sdk/platform-tools/adb install -r /Users/douwe/GitHub/android/OdooFieldApp/app/build/outputs/apk/debug/app-debug.apk)",
+      "Bash(shasum:*)"
     ]
   }
 }

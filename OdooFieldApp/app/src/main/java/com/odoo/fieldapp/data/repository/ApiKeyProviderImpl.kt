@@ -30,7 +30,7 @@ class ApiKeyProviderImpl @Inject constructor(
     
     companion object {
         private val API_KEY = stringPreferencesKey("api_key")
-        private val DATABASE_NAME = stringPreferencesKey("database_name")
+        private val SERVER_URL = stringPreferencesKey("server_url")
     }
     
     override suspend fun getApiKey(): String? {
@@ -51,28 +51,36 @@ class ApiKeyProviderImpl @Inject constructor(
         }
     }
     
-    override suspend fun getDatabaseName(): String? {
+    override suspend fun getServerUrl(): String? {
         return context.dataStore.data
-            .map { preferences -> preferences[DATABASE_NAME] }
+            .map { preferences -> preferences[SERVER_URL] }
             .first()
     }
 
-    override suspend fun setDatabaseName(databaseName: String) {
+    override suspend fun setServerUrl(serverUrl: String) {
         context.dataStore.edit { preferences ->
-            preferences[DATABASE_NAME] = databaseName
+            preferences[SERVER_URL] = serverUrl
         }
     }
 
     /**
-     * Build the base URL from the database name
-     * Format: https://[database-name].odoo.com/
+     * Build the base URL from the server URL
+     * Adds https:// if not present and ensures trailing slash
      */
     suspend fun getBaseUrl(): String {
-        val dbName = getDatabaseName()
-        return if (dbName.isNullOrBlank()) {
-            "https://test.odoo.com/"  // Fallback
-        } else {
-            "https://${dbName}.odoo.com/"
+        val url = getServerUrl()
+        if (url.isNullOrBlank()) {
+            return "https://test.odoo.com/"  // Fallback
         }
+
+        // Add https:// if no protocol specified
+        val fullUrl = if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            "https://$url"
+        } else {
+            url
+        }
+
+        // Ensure trailing slash
+        return if (fullUrl.endsWith("/")) fullUrl else "$fullUrl/"
     }
 }

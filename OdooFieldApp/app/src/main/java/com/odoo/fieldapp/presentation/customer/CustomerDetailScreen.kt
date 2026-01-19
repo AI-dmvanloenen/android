@@ -45,7 +45,7 @@ fun CustomerDetailScreen(
                     .padding(paddingValues),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator()
+                Text("Loading...")
             }
         } else {
             // Customer details

@@ -91,15 +91,15 @@ fun AppNavigation(
         // Settings Screen
         composable(Screen.Settings.route) {
             val viewModel: SettingsViewModel = hiltViewModel()
-            val databaseName by viewModel.databaseName.collectAsState()
+            val serverUrl by viewModel.serverUrl.collectAsState()
             val apiKey by viewModel.apiKey.collectAsState()
             val saveState by viewModel.saveState.collectAsState()
 
             SettingsScreen(
-                databaseName = databaseName,
+                serverUrl = serverUrl,
                 apiKey = apiKey,
                 saveState = saveState,
-                onDatabaseNameChange = viewModel::onDatabaseNameChange,
+                onServerUrlChange = viewModel::onServerUrlChange,
                 onApiKeyChange = viewModel::onApiKeyChange,
                 onSaveClick = viewModel::saveSettings,
                 onBackClick = { navController.popBackStack() },

@@ -141,13 +141,13 @@ class CustomerRepositoryImpl @Inject constructor(
 }
 
 /**
- * Interface for providing API key and database name
+ * Interface for providing API key and server URL
  * Implementation will use DataStore to persist the values
  */
 interface ApiKeyProvider {
     suspend fun getApiKey(): String?
     suspend fun setApiKey(apiKey: String)
     suspend fun clearApiKey()
-    suspend fun getDatabaseName(): String?
-    suspend fun setDatabaseName(databaseName: String)
+    suspend fun getServerUrl(): String?
+    suspend fun setServerUrl(serverUrl: String)
 }
