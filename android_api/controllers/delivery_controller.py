@@ -6,8 +6,9 @@ from odoo.http import request
 import logging
 
 from .auth import (
-    api_authenticate, get_pagination_params, json_error, paginated_response,
-    check_rate_limit, format_datetime, get_filter_params, build_domain
+    api_authenticate, get_pagination_params, json_error, json_response,
+    paginated_response, check_rate_limit, format_datetime, get_filter_params,
+    build_domain
 )
 
 _logger = logging.getLogger(__name__)
@@ -87,34 +88,34 @@ class DeliveryController(http.Controller):
             'lines': lines,
         }
 
-    @http.route('/deliveries', type='json', auth='none', methods=['POST'], cors='*', csrf=False)
+    @http.route('/deliveries', type='http', auth='none', methods=['POST'], cors='*', csrf=False)
     def update_delivery_status(self):
         """Update delivery status to 'done'."""
         # Rate limiting
-        allowed, _ = check_rate_limit()
+        allowed, error = check_rate_limit()
         if not allowed:
-            return {'error': 'Rate limit exceeded', 'status': 429}
+            return error
 
         if not api_authenticate():
-            return {'error': 'Unauthorized', 'status': 401}
+            return json_error("Unauthorized", status=401)
 
         try:
-            params = request.jsonrequest
+            params = request.httprequest.json
             delivery_id = params.get('id')
 
             if not delivery_id:
-                return {'error': 'Missing required field: id', 'status': 400}
+                return json_error("Missing required field: id", status=400)
 
             picking = request.env['stock.picking'].sudo().browse(delivery_id)
 
             if not picking.exists():
-                return {'error': f'Delivery {delivery_id} not found', 'status': 404}
+                return json_error(f"Delivery {delivery_id} not found", status=404)
 
             if picking.state == 'done':
-                return {'error': 'Delivery is already done', 'status': 400}
+                return json_error("Delivery is already done", status=400)
 
             if picking.state == 'cancel':
-                return {'error': 'Cannot complete a cancelled delivery', 'status': 400}
+                return json_error("Cannot complete a cancelled delivery", status=400)
 
             # Set quantities done to match demand for all move lines
             for move in picking.move_ids_without_package:
@@ -124,8 +125,8 @@ class DeliveryController(http.Controller):
             picking.button_validate()
 
             _logger.info(f'POST /deliveries - Marked delivery {delivery_id} as done')
-            return {'success': True, 'delivery': self.__picking_to_dict(picking)}
+            return json_response({'success': True, 'delivery': self.__picking_to_dict(picking)})
 
         except Exception as exp:
             _logger.exception('API exception')
-            return {'error': 'Internal server error', 'status': 500, 'details': str(exp)}
+            return json_error("Internal server error", status=500, details=str(exp))
