@@ -1,0 +1,32 @@
+package com.odoo.fieldapp.domain.model
+
+import java.util.Date
+
+/**
+ * Domain model for Customer
+ * This represents a customer in the business logic layer
+ */
+data class Customer(
+    val id: String,              // Local UUID
+    val cradleUid: String,       // Unique ID for Odoo sync
+    val name: String,
+    val city: String?,
+    val taxId: String?,
+    val email: String?,
+    val phone: String?,
+    val website: String?,
+    val date: Date?,
+    val syncState: SyncState,
+    val lastModified: Date,
+    val odooId: Int?             // Odoo record ID (populated after sync)
+)
+
+/**
+ * Sync state for tracking record synchronization status
+ */
+enum class SyncState {
+    SYNCED,      // Successfully synced with Odoo
+    PENDING,     // Waiting to be synced
+    SYNCING,     // Currently being synced
+    ERROR        // Sync failed
+}
