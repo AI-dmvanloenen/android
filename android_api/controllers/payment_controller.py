@@ -136,7 +136,7 @@ class PaymentController(http.Controller):
             'partner_id': payment.partner_id.id if payment.partner_id else None,
             'amount': payment.amount,
             'date': format_date(payment.date),
-            'memo': payment.ref or '',
+            'memo': payment.memo or '',
             'journal_id': payment.journal_id.id if payment.journal_id else None,
             'state': payment.state or '',
             'write_date': format_datetime(payment.write_date) if payment.write_date else None,
@@ -173,6 +173,6 @@ class PaymentController(http.Controller):
 
         memo = data.get('memo')
         if memo:
-            vals['ref'] = memo
+            vals['memo'] = memo
 
         return {k: v for k, v in vals.items() if v is not None}

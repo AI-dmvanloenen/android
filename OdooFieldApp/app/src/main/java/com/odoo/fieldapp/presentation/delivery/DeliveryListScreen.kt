@@ -14,8 +14,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.odoo.fieldapp.domain.model.Delivery
 import com.odoo.fieldapp.domain.model.Resource
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
+
+/**
+ * Filter options for delivery list
+ */
+enum class DeliveryFilter {
+    OPEN,   // All deliveries with state NOT "done"
+    CLOSED  // All deliveries with state "done"
+}
 
 /**
  * Delivery List Screen
@@ -34,6 +43,24 @@ fun DeliveryListScreen(
     onDeliveryClick: (Delivery) -> Unit,
     onClearSyncState: () -> Unit
 ) {
+    var selectedFilter by remember { mutableStateOf(DeliveryFilter.OPEN) }
+
+    // Filter deliveries based on selected filter
+    val filteredDeliveries = remember(deliveries, selectedFilter) {
+        when (selectedFilter) {
+            DeliveryFilter.OPEN -> deliveries.filter { it.state.lowercase() != "done" }
+            DeliveryFilter.CLOSED -> deliveries.filter { it.state.lowercase() == "done" }
+        }
+    }
+
+    // Auto-dismiss success messages after 3 seconds
+    LaunchedEffect(syncState) {
+        if (syncState is Resource.Success) {
+            delay(3000)
+            onClearSyncState()
+        }
+    }
+
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
@@ -48,6 +75,17 @@ fun DeliveryListScreen(
                 .fillMaxWidth()
                 .padding(16.dp)
         )
+
+        // Filter buttons
+        DeliveryFilterButtons(
+            selectedFilter = selectedFilter,
+            onFilterChange = { selectedFilter = it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
 
         // Sync state messages
         syncState?.let { state ->
@@ -71,17 +109,66 @@ fun DeliveryListScreen(
         }
 
         // Deliveries list or empty state
-        if (deliveries.isEmpty()) {
+        if (filteredDeliveries.isEmpty()) {
             DeliveryEmptyState(
                 searchQuery = searchQuery,
-                onSyncClick = onSyncClick
+                onSyncClick = onSyncClick,
+                filter = selectedFilter
             )
         } else {
             DeliveryList(
-                deliveries = deliveries,
+                deliveries = filteredDeliveries,
                 onDeliveryClick = onDeliveryClick
             )
         }
+    }
+}
+
+/**
+ * Filter buttons for Open/Closed deliveries
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DeliveryFilterButtons(
+    selectedFilter: DeliveryFilter,
+    onFilterChange: (DeliveryFilter) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        FilterChip(
+            selected = selectedFilter == DeliveryFilter.OPEN,
+            onClick = { onFilterChange(DeliveryFilter.OPEN) },
+            label = { Text("Open") },
+            leadingIcon = if (selectedFilter == DeliveryFilter.OPEN) {
+                {
+                    Icon(
+                        Icons.Default.Check,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            } else null,
+            modifier = Modifier.weight(1f)
+        )
+
+        FilterChip(
+            selected = selectedFilter == DeliveryFilter.CLOSED,
+            onClick = { onFilterChange(DeliveryFilter.CLOSED) },
+            label = { Text("Closed") },
+            leadingIcon = if (selectedFilter == DeliveryFilter.CLOSED) {
+                {
+                    Icon(
+                        Icons.Default.Check,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            } else null,
+            modifier = Modifier.weight(1f)
+        )
     }
 }
 
@@ -297,7 +384,8 @@ fun DeliveryStateBadge(state: String) {
 @Composable
 fun DeliveryEmptyState(
     searchQuery: String,
-    onSyncClick: () -> Unit
+    onSyncClick: () -> Unit,
+    filter: DeliveryFilter = DeliveryFilter.OPEN
 ) {
     Column(
         modifier = Modifier
@@ -316,10 +404,11 @@ fun DeliveryEmptyState(
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = if (searchQuery.isEmpty()) {
-                "No deliveries yet"
-            } else {
-                "No deliveries found"
+            text = when {
+                searchQuery.isNotEmpty() -> "No deliveries found"
+                filter == DeliveryFilter.OPEN -> "No open deliveries"
+                filter == DeliveryFilter.CLOSED -> "No closed deliveries"
+                else -> "No deliveries yet"
             },
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -328,16 +417,17 @@ fun DeliveryEmptyState(
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = if (searchQuery.isEmpty()) {
-                "Tap the sync button to load deliveries from Odoo"
-            } else {
-                "Try a different search term"
+            text = when {
+                searchQuery.isNotEmpty() -> "Try a different search term"
+                filter == DeliveryFilter.OPEN -> "All deliveries have been completed"
+                filter == DeliveryFilter.CLOSED -> "No deliveries have been completed yet"
+                else -> "Tap the sync button to load deliveries from Odoo"
             },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        if (searchQuery.isEmpty()) {
+        if (searchQuery.isEmpty() && filter == DeliveryFilter.OPEN) {
             Spacer(modifier = Modifier.height(16.dp))
             Button(onClick = onSyncClick) {
                 Icon(Icons.Default.Refresh, contentDescription = "Sync")

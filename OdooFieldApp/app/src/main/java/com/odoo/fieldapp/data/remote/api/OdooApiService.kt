@@ -4,6 +4,9 @@ import com.odoo.fieldapp.data.remote.dto.CustomerPaginatedResponse
 import com.odoo.fieldapp.data.remote.dto.CustomerRequest
 import com.odoo.fieldapp.data.remote.dto.CustomerResponse
 import com.odoo.fieldapp.data.remote.dto.DeliveryPaginatedResponse
+import com.odoo.fieldapp.data.remote.dto.PaymentCreateResponse
+import com.odoo.fieldapp.data.remote.dto.PaymentPaginatedResponse
+import com.odoo.fieldapp.data.remote.dto.PaymentRequest
 import com.odoo.fieldapp.data.remote.dto.SalePaginatedResponse
 import com.odoo.fieldapp.data.remote.dto.ValidateDeliveryRequest
 import com.odoo.fieldapp.data.remote.dto.ValidateDeliveryResponse
@@ -71,7 +74,25 @@ interface OdooApiService {
         @Body request: ValidateDeliveryRequest
     ): Response<ValidateDeliveryResponse>
 
-    // Future endpoints:
-    // @GET("payment")
-    // suspend fun getPayments(@Header("Authorization") apiKey: String): Response<List<PaymentResponse>>
+    /**
+     * Fetch all payments from Odoo
+     * GET /payments
+     * Returns paginated response wrapper
+     */
+    @GET("payments")
+    suspend fun getPayments(
+        @Header("Authorization") apiKey: String
+    ): Response<PaymentPaginatedResponse>
+
+    /**
+     * Create new payments in Odoo (batch operation)
+     * POST /payments
+     *
+     * Accepts a list of payments in the request body
+     */
+    @POST("payments")
+    suspend fun createPayments(
+        @Header("Authorization") apiKey: String,
+        @Body payments: List<PaymentRequest>
+    ): Response<PaymentCreateResponse>
 }

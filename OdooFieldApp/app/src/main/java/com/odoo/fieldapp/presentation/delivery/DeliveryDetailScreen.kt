@@ -194,6 +194,16 @@ private fun DeliveryHeaderCard(delivery: Delivery) {
 
                 DeliveryStateBadge(state = delivery.state)
             }
+
+            // Show customer name below delivery name
+            delivery.partnerName?.let { customerName ->
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = customerName,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                )
+            }
         }
     }
 }

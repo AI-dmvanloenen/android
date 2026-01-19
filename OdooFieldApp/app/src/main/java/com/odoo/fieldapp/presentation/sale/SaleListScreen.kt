@@ -14,6 +14,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.odoo.fieldapp.domain.model.Resource
 import com.odoo.fieldapp.domain.model.Sale
+import kotlinx.coroutines.delay
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -35,6 +36,14 @@ fun SaleListScreen(
     onSaleClick: (Sale) -> Unit,
     onClearSyncState: () -> Unit
 ) {
+    // Auto-dismiss success messages after 3 seconds
+    LaunchedEffect(syncState) {
+        if (syncState is Resource.Success) {
+            delay(3000)
+            onClearSyncState()
+        }
+    }
+
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
@@ -177,19 +186,25 @@ fun SaleListItem(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            // Sale name/reference
+            // Sale name with customer name
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = sale.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    // Sale name and customer name combined
+                    Text(
+                        text = if (sale.partnerName != null) {
+                            "${sale.name} - ${sale.partnerName}"
+                        } else {
+                            sale.name
+                        },
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
 
                 // Amount
                 sale.amountTotal?.let { amount ->
@@ -203,32 +218,11 @@ fun SaleListItem(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // Customer and date
+            // Date
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.Start
             ) {
-                // Customer name
-                sale.partnerName?.let { customerName ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.Person,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = customerName,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                // Date
                 sale.dateOrder?.let { date ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(

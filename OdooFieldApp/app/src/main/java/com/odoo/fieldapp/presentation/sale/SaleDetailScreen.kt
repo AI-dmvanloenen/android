@@ -65,11 +65,6 @@ fun SaleDetailScreen(
                 // Order information
                 SaleInfoCard(sale)
 
-                // Customer information
-                if (sale.partnerId != null || customerName != null) {
-                    CustomerInfoCard(sale = sale, customerName = customerName)
-                }
-
                 // System information
                 SystemInfoCard(sale)
             }
@@ -79,8 +74,6 @@ fun SaleDetailScreen(
 
 @Composable
 private fun SaleHeaderCard(sale: Sale) {
-    val currencyFormatter = NumberFormat.getCurrencyInstance(Locale.US)
-
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -98,12 +91,13 @@ private fun SaleHeaderCard(sale: Sale) {
                 color = MaterialTheme.colorScheme.onPrimaryContainer
             )
 
-            sale.amountTotal?.let { amount ->
-                Spacer(modifier = Modifier.height(8.dp))
+            // Show customer name below SO name
+            sale.partnerName?.let { customerName ->
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = currencyFormatter.format(amount),
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                    text = customerName,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                 )
             }
         }
@@ -142,43 +136,6 @@ private fun SaleInfoCard(sale: Sale) {
                     icon = Icons.Default.AttachMoney,
                     label = "Total Amount",
                     value = currencyFormatter.format(amount)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun CustomerInfoCard(sale: Sale, customerName: String?) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                text = "Customer",
-                style = MaterialTheme.typography.titleMedium
-            )
-
-            Divider()
-
-            // Show customer name (from lookup) or fall back to partner name from sale
-            val displayName = customerName ?: sale.partnerName
-            displayName?.let { name ->
-                SaleDetailRow(
-                    icon = Icons.Default.Person,
-                    label = "Customer Name",
-                    value = name
-                )
-            }
-
-            sale.partnerId?.let { id ->
-                SaleDetailRow(
-                    icon = Icons.Default.Badge,
-                    label = "Customer ID",
-                    value = id.toString()
                 )
             }
         }

@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -89,6 +90,14 @@ fun CustomerListScreen(
                     .padding(16.dp)
             )
             
+            // Auto-dismiss success messages after 3 seconds
+            LaunchedEffect(syncState) {
+                if (syncState is Resource.Success) {
+                    delay(3000)
+                    onClearSyncState()
+                }
+            }
+
             // Sync state messages
             syncState?.let { state ->
                 when (state) {

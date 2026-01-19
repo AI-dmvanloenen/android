@@ -17,6 +17,10 @@ import com.odoo.fieldapp.presentation.customer.CustomerViewModel
 import com.odoo.fieldapp.presentation.delivery.DeliveryDetailScreen
 import com.odoo.fieldapp.presentation.delivery.DeliveryListScreen
 import com.odoo.fieldapp.presentation.delivery.DeliveryViewModel
+import com.odoo.fieldapp.presentation.payment.PaymentCreateScreen
+import com.odoo.fieldapp.presentation.payment.PaymentDetailScreen
+import com.odoo.fieldapp.presentation.payment.PaymentListScreen
+import com.odoo.fieldapp.presentation.payment.PaymentViewModel
 import com.odoo.fieldapp.presentation.sale.SaleDetailScreen
 import com.odoo.fieldapp.presentation.sale.SaleListScreen
 import com.odoo.fieldapp.presentation.sale.SaleViewModel
@@ -39,6 +43,11 @@ sealed class Screen(val route: String) {
     object DeliveriesList : Screen("deliveries_list")
     object DeliveryDetail : Screen("delivery_detail/{deliveryId}") {
         fun createRoute(deliveryId: Int) = "delivery_detail/$deliveryId"
+    }
+    object PaymentsList : Screen("payments_list")
+    object PaymentCreate : Screen("payment_create")
+    object PaymentDetail : Screen("payment_detail/{paymentId}") {
+        fun createRoute(paymentId: Int) = "payment_detail/$paymentId"
     }
     object Settings : Screen("settings")
 }
@@ -287,6 +296,97 @@ fun AppNavigation(
                 onSaleClick = { saleId ->
                     navController.navigate(
                         Screen.SaleDetail.createRoute(saleId)
+                    )
+                }
+            )
+        }
+
+        // Payments List Screen
+        composable(Screen.PaymentsList.route) {
+            val viewModel: PaymentViewModel = hiltViewModel()
+            val payments by viewModel.payments.collectAsState()
+            val searchQuery by viewModel.searchQuery.collectAsState()
+            val syncState by viewModel.syncState.collectAsState()
+
+            PaymentListScreen(
+                payments = payments,
+                searchQuery = searchQuery,
+                syncState = syncState,
+                onSearchQueryChange = viewModel::onSearchQueryChange,
+                onClearSearch = viewModel::clearSearch,
+                onSyncClick = viewModel::syncPayments,
+                onPaymentClick = { payment ->
+                    navController.navigate(
+                        Screen.PaymentDetail.createRoute(payment.id)
+                    )
+                },
+                onCreateClick = {
+                    navController.navigate(Screen.PaymentCreate.route)
+                },
+                onClearSyncState = viewModel::clearSyncState
+            )
+        }
+
+        // Payment Create Screen
+        composable(Screen.PaymentCreate.route) {
+            val paymentViewModel: PaymentViewModel = hiltViewModel()
+            val customerViewModel: CustomerViewModel = hiltViewModel()
+
+            val customers by customerViewModel.customers.collectAsState()
+            val selectedPartnerId by paymentViewModel.createPartnerId.collectAsState()
+            val selectedPartnerName by paymentViewModel.createPartnerName.collectAsState()
+            val amount by paymentViewModel.createAmount.collectAsState()
+            val memo by paymentViewModel.createMemo.collectAsState()
+            val partnerError by paymentViewModel.partnerError.collectAsState()
+            val amountError by paymentViewModel.amountError.collectAsState()
+            val createState by paymentViewModel.createState.collectAsState()
+
+            PaymentCreateScreen(
+                customers = customers,
+                selectedPartnerId = selectedPartnerId,
+                selectedPartnerName = selectedPartnerName,
+                amount = amount,
+                memo = memo,
+                partnerError = partnerError,
+                amountError = amountError,
+                createState = createState,
+                onPartnerChange = paymentViewModel::onCreatePartnerChange,
+                onAmountChange = paymentViewModel::onCreateAmountChange,
+                onMemoChange = paymentViewModel::onCreateMemoChange,
+                onSaveClick = paymentViewModel::createPayment,
+                onBackClick = {
+                    paymentViewModel.clearCreateForm()
+                    navController.popBackStack()
+                },
+                onClearCreateState = paymentViewModel::clearCreateState
+            )
+        }
+
+        // Payment Detail Screen
+        composable(
+            route = Screen.PaymentDetail.route,
+            arguments = listOf(
+                navArgument("paymentId") { type = NavType.IntType }
+            )
+        ) { backStackEntry ->
+            val viewModel: PaymentViewModel = hiltViewModel()
+            val paymentId = backStackEntry.arguments?.getInt("paymentId") ?: 0
+            val payment by viewModel.selectedPayment.collectAsState()
+
+            // Load payment when screen opens
+            if (payment == null && paymentId != 0) {
+                viewModel.loadPaymentById(paymentId)
+            }
+
+            PaymentDetailScreen(
+                payment = payment,
+                onBackClick = {
+                    viewModel.clearSelectedPayment()
+                    navController.popBackStack()
+                },
+                onCustomerClick = { customerId ->
+                    navController.navigate(
+                        Screen.CustomerDetail.createRoute(customerId)
                     )
                 }
             )

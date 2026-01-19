@@ -9,6 +9,7 @@ import com.odoo.fieldapp.data.local.OdooDatabase
 import com.odoo.fieldapp.data.local.dao.CustomerDao
 import com.odoo.fieldapp.data.local.dao.DeliveryDao
 import com.odoo.fieldapp.data.local.dao.DeliveryLineDao
+import com.odoo.fieldapp.data.local.dao.PaymentDao
 import com.odoo.fieldapp.data.local.dao.SaleDao
 import com.odoo.fieldapp.data.remote.DynamicBaseUrlInterceptor
 import com.odoo.fieldapp.data.remote.api.OdooApiService
@@ -16,9 +17,11 @@ import com.odoo.fieldapp.data.repository.ApiKeyProvider
 import com.odoo.fieldapp.data.repository.ApiKeyProviderImpl
 import com.odoo.fieldapp.data.repository.CustomerRepositoryImpl
 import com.odoo.fieldapp.data.repository.DeliveryRepositoryImpl
+import com.odoo.fieldapp.data.repository.PaymentRepositoryImpl
 import com.odoo.fieldapp.data.repository.SaleRepositoryImpl
 import com.odoo.fieldapp.domain.repository.CustomerRepository
 import com.odoo.fieldapp.domain.repository.DeliveryRepository
+import com.odoo.fieldapp.domain.repository.PaymentRepository
 import com.odoo.fieldapp.domain.repository.SaleRepository
 import dagger.Module
 import dagger.Provides
@@ -231,6 +234,34 @@ object AppModule {
             deliveryLineDao,
             customerDao,
             saleDao,
+            apiService,
+            apiKeyProvider
+        )
+    }
+
+    /**
+     * Provide Payment DAO
+     */
+    @Provides
+    @Singleton
+    fun providePaymentDao(database: OdooDatabase): PaymentDao {
+        return database.paymentDao()
+    }
+
+    /**
+     * Provide PaymentRepository
+     */
+    @Provides
+    @Singleton
+    fun providePaymentRepository(
+        paymentDao: PaymentDao,
+        customerDao: CustomerDao,
+        apiService: OdooApiService,
+        apiKeyProvider: ApiKeyProvider
+    ): PaymentRepository {
+        return PaymentRepositoryImpl(
+            paymentDao,
+            customerDao,
             apiService,
             apiKeyProvider
         )

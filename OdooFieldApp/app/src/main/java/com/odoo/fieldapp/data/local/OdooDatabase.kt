@@ -7,10 +7,12 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.odoo.fieldapp.data.local.dao.CustomerDao
 import com.odoo.fieldapp.data.local.dao.DeliveryDao
 import com.odoo.fieldapp.data.local.dao.DeliveryLineDao
+import com.odoo.fieldapp.data.local.dao.PaymentDao
 import com.odoo.fieldapp.data.local.dao.SaleDao
 import com.odoo.fieldapp.data.local.entity.CustomerEntity
 import com.odoo.fieldapp.data.local.entity.DeliveryEntity
 import com.odoo.fieldapp.data.local.entity.DeliveryLineEntity
+import com.odoo.fieldapp.data.local.entity.PaymentEntity
 import com.odoo.fieldapp.data.local.entity.SaleEntity
 
 /**
@@ -22,9 +24,9 @@ import com.odoo.fieldapp.data.local.entity.SaleEntity
  * Version 4: Added Sale entity
  * Version 5: Added mobileUid column to customers table
  * Version 6: Added Delivery and DeliveryLine entities
+ * Version 7: Added Payment entity
  *
  * Future versions will add:
- * - PaymentEntity
  * - SyncQueueEntity
  */
 @Database(
@@ -33,8 +35,9 @@ import com.odoo.fieldapp.data.local.entity.SaleEntity
         SaleEntity::class,
         DeliveryEntity::class,
         DeliveryLineEntity::class,
+        PaymentEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true
 )
 abstract class OdooDatabase : RoomDatabase() {
@@ -43,6 +46,7 @@ abstract class OdooDatabase : RoomDatabase() {
     abstract fun saleDao(): SaleDao
     abstract fun deliveryDao(): DeliveryDao
     abstract fun deliveryLineDao(): DeliveryLineDao
+    abstract fun paymentDao(): PaymentDao
 
     companion object {
         const val DATABASE_NAME = "odoo_field_db"
@@ -102,12 +106,45 @@ abstract class OdooDatabase : RoomDatabase() {
         }
 
         /**
+         * Migration from version 6 to 7
+         * Adds Payment table
+         */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Create payments table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS payments (
+                        id INTEGER NOT NULL PRIMARY KEY,
+                        mobileUid TEXT,
+                        name TEXT NOT NULL,
+                        partnerId INTEGER,
+                        partnerName TEXT,
+                        amount REAL NOT NULL,
+                        date INTEGER,
+                        memo TEXT,
+                        journalId INTEGER,
+                        state TEXT NOT NULL,
+                        syncState TEXT NOT NULL,
+                        lastModified INTEGER NOT NULL
+                    )
+                """.trimIndent())
+
+                // Create indices for payments table
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_payments_name ON payments (name)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_payments_partnerId ON payments (partnerId)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_payments_mobileUid ON payments (mobileUid)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_payments_state ON payments (state)")
+            }
+        }
+
+        /**
          * All database migrations
          * Add new migrations here as schema evolves
          */
         val ALL_MIGRATIONS = arrayOf<Migration>(
             MIGRATION_4_5,
             MIGRATION_5_6,
+            MIGRATION_6_7,
         )
     }
 }
