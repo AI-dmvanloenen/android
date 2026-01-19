@@ -1,75 +1,91 @@
 # -*- coding: utf-8 -*-
+
+from odoo import http
+from odoo.http import request, Response
+from odoo.exceptions import UserError
+
 import json
 import logging
-from datetime import datetime
-
-from odoo import http, fields
-from odoo.http import request, Response
 
 _logger = logging.getLogger(__name__)
 
 
 class CustomerController(http.Controller):
-    """
-    REST API Controller for Customer (res.partner) operations.
 
-    Endpoints:
-        GET  /customer - Fetch all customers
-        POST /customer - Create customers in batch
+    @http.route('/customer', type='http', auth='none', methods=['GET'], cors='*', csrf=False)
+    def get_customers(self):
+        if not self.__api_authentication():
+            return Response("Unauthorized", status=401)
 
-    Authentication:
-        All endpoints require Authorization header with valid API key
-    """
+        try:
+            partners_env = request.env['res.partner'].sudo()
+            customers = partners_env.search([
+                ('customer_rank', '>', 0),
+                ('active', '=', True),
+            ])
 
-    def _validate_api_key(self):
-        """
-        Validate the API key from Authorization header.
-        Returns tuple: (api_key_record, error_response)
-        """
-        auth_header = request.httprequest.headers.get('Authorization', '')
+            result = []
+            for partner in customers:
+                result.append(self.__partner_to_dict(partner))
 
-        if not auth_header:
-            return None, self._error_response(401, 'Missing Authorization header')
+            _logger.info(f'GET /customer - Returned {len(result)} customers')
+            return Response(json.dumps(result, default=str), status=200, content_type='application/json')
 
-        # Support both "Bearer <key>" and raw key formats
-        api_key = auth_header.replace('Bearer ', '').strip()
+        except (UserError, ValueError) as exp:
+            _logger.exception('API exception')
+            return Response(f"BadRequest - {exp}", status=400)
 
-        api_key_model = request.env['android.api.key'].sudo()
-        api_key_record = api_key_model.validate_key(api_key)
+        except:
+            _logger.exception('API exception')
+            return Response("InternalServerError", status=500)
 
-        if not api_key_record:
-            return None, self._error_response(401, 'Invalid API key')
+    @http.route('/customer', type='http', auth='none', methods=['POST'], cors='*', csrf=False)
+    def create_customers(self):
+        if not self.__api_authentication():
+            return Response("Unauthorized", status=401)
 
-        return api_key_record, None
+        try:
+            payload = request.httprequest.json
 
-    def _error_response(self, status_code, message, details=None):
-        """Create standardized error response."""
-        error_body = {
-            'error': message,
-            'status': status_code
-        }
-        if details:
-            error_body['details'] = details
+            if not isinstance(payload, list):
+                return Response("Request body must be a JSON array", status=400)
 
-        return Response(
-            json.dumps(error_body),
-            status=status_code,
-            content_type='application/json'
-        )
+            partners_env = request.env['res.partner'].sudo()
+            created_customers = []
 
-    def _success_response(self, data, status_code=200):
-        """Create standardized success response."""
-        return Response(
-            json.dumps(data, default=str),
-            status=status_code,
-            content_type='application/json'
-        )
+            for customer_data in payload:
+                mobile_uid = customer_data.get('mobile_uid')
+                if not mobile_uid:
+                    return Response("mobile_uid missing", status=400)
 
-    def _partner_to_dict(self, partner):
-        """
-        Convert res.partner record to API response dictionary.
-        Maps Odoo fields to the expected JSON structure.
-        """
+                name = customer_data.get('name')
+                if not name:
+                    return Response("name missing", status=400)
+
+                partner_vals = self.__dict_to_partner_vals(customer_data)
+
+                partner = partners_env.search([('mobile_uid', '=', mobile_uid)], limit=1)
+                if partner:
+                    partner_vals.pop('mobile_uid', None)
+                    partner.write(partner_vals)
+                    _logger.info(f'Customer {partner.id} updated')
+                else:
+                    partner = partners_env.create(partner_vals)
+                    _logger.info(f'Customer {partner.id} created')
+
+                created_customers.append(self.__partner_to_dict(partner))
+
+            return Response(json.dumps(created_customers, default=str), status=200, content_type='application/json')
+
+        except (UserError, ValueError) as exp:
+            _logger.exception('API exception')
+            return Response(f"BadRequest - {exp}", status=400)
+
+        except:
+            _logger.exception('API exception')
+            return Response("InternalServerError", status=500)
+
+    def __partner_to_dict(self, partner):
         date_str = None
         if partner.mobile_sync_date:
             if isinstance(partner.mobile_sync_date, str):
@@ -89,11 +105,9 @@ class CustomerController(http.Controller):
             'date': date_str,
         }
 
-    def _dict_to_partner_vals(self, data):
-        """
-        Convert API request dictionary to res.partner field values.
-        Maps JSON fields to Odoo fields.
-        """
+    def __dict_to_partner_vals(self, data):
+        from datetime import datetime
+
         vals = {
             'name': data.get('name'),
             'mobile_uid': data.get('mobile_uid'),
@@ -115,145 +129,21 @@ class CustomerController(http.Controller):
 
         return {k: v for k, v in vals.items() if v is not None}
 
-    @http.route(
-        '/customer',
-        type='http',
-        auth='none',
-        methods=['GET'],
-        csrf=False,
-        cors='*'
-    )
-    def get_customers(self, **kwargs):
-        """
-        GET /customer
+    def __api_authentication(self):
+        api_key = request.httprequest.headers.get('Authorization')
+        if not api_key:
+            _logger.warning("Failed API authentication! No 'Authorization' header or empty!")
+            return False
 
-        Fetch all customers from res.partner.
+        # Support both "Bearer <key>" and raw key formats
+        api_key = api_key.replace('Bearer ', '').strip()
 
-        Headers:
-            Authorization: <API_KEY>
+        user_id = request.env['res.users.apikeys']._check_credentials(scope='rpc', key=api_key)
 
-        Returns:
-            200: JSON array of customer objects
-            401: Authentication failed
-            500: Server error
-        """
-        try:
-            api_key_record, error = self._validate_api_key()
-            if error:
-                return error
-
-            Partner = request.env['res.partner'].sudo()
-            customers = Partner.search([
-                ('customer_rank', '>', 0),
-                ('active', '=', True),
-            ])
-
-            result = [self._partner_to_dict(c) for c in customers]
-
-            _logger.info(f"GET /customer - Returned {len(result)} customers")
-            return self._success_response(result)
-
-        except Exception as e:
-            _logger.exception("Error in GET /customer")
-            return self._error_response(500, 'Internal server error', str(e))
-
-    @http.route(
-        '/customer',
-        type='http',
-        auth='none',
-        methods=['POST'],
-        csrf=False,
-        cors='*'
-    )
-    def create_customers(self, **kwargs):
-        """
-        POST /customer
-
-        Create customers in batch.
-
-        Headers:
-            Authorization: <API_KEY>
-            Content-Type: application/json
-
-        Body:
-            JSON array of customer objects
-
-        Returns:
-            200: JSON array of created customer objects (with Odoo IDs)
-            400: Invalid request body
-            401: Authentication failed
-            500: Server error
-        """
-        try:
-            api_key_record, error = self._validate_api_key()
-            if error:
-                return error
-
-            try:
-                body = request.httprequest.get_data(as_text=True)
-                customers_data = json.loads(body)
-            except json.JSONDecodeError as e:
-                return self._error_response(400, 'Invalid JSON body', str(e))
-
-            if not isinstance(customers_data, list):
-                return self._error_response(400, 'Request body must be a JSON array')
-
-            Partner = request.env['res.partner'].sudo()
-            created_customers = []
-            errors = []
-
-            for idx, customer_data in enumerate(customers_data):
-                try:
-                    if not customer_data.get('name'):
-                        errors.append({
-                            'index': idx,
-                            'error': 'Missing required field: name'
-                        })
-                        continue
-
-                    if not customer_data.get('mobile_uid'):
-                        errors.append({
-                            'index': idx,
-                            'error': 'Missing required field: mobile_uid'
-                        })
-                        continue
-
-                    existing = Partner.search([
-                        ('mobile_uid', '=', customer_data['mobile_uid'])
-                    ], limit=1)
-
-                    if existing:
-                        vals = self._dict_to_partner_vals(customer_data)
-                        vals.pop('mobile_uid', None)
-                        existing.write(vals)
-                        created_customers.append(self._partner_to_dict(existing))
-                        _logger.info(
-                            f"Updated customer with mobile_uid: {customer_data['mobile_uid']}"
-                        )
-                    else:
-                        vals = self._dict_to_partner_vals(customer_data)
-                        new_partner = Partner.create(vals)
-                        created_customers.append(self._partner_to_dict(new_partner))
-                        _logger.info(
-                            f"Created customer with mobile_uid: {customer_data['mobile_uid']}"
-                        )
-
-                except Exception as e:
-                    errors.append({
-                        'index': idx,
-                        'error': str(e),
-                        'mobile_uid': customer_data.get('mobile_uid', 'unknown')
-                    })
-                    _logger.exception(f"Error creating customer at index {idx}")
-
-            if errors:
-                _logger.warning(f"POST /customer completed with {len(errors)} errors")
-
-            _logger.info(
-                f"POST /customer - Created/updated {len(created_customers)} customers"
-            )
-            return self._success_response(created_customers)
-
-        except Exception as e:
-            _logger.exception("Error in POST /customer")
-            return self._error_response(500, 'Internal server error', str(e))
+        if user_id:
+            request.env.user = request.env['res.users'].browse(user_id)
+            request.env.uid = user_id
+            return True
+        else:
+            _logger.warning(f"Failed API authentication! Authorization: {api_key}")
+            return False
