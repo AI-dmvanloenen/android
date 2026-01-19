@@ -33,20 +33,19 @@ class AndroidApiKey(models.Model):
         """Generate a secure random API key."""
         return secrets.token_hex(32)
 
-    @api.model
-    def validate_key(self, api_key):
-        """
-        Validate an API key and return the associated record if valid.
-        Returns False if invalid.
-        """
-        if not api_key:
-            return False
-        key_hash = hashlib.sha256(api_key.encode()).hexdigest()
-        api_key_record = self.search([
-            ('key_hash', '=', key_hash),
-            ('active', '=', True)
-        ], limit=1)
-        if api_key_record:
-            api_key_record.sudo().write({'last_used': fields.Datetime.now()})
-            return api_key_record
-        return False
+    @api.model                                                                                                                            
+    def validate_key(self, api_key):                                                                                                      
+        """                                                                                                                               
+        Validate an API key and return the associated record if valid.                                                                    
+        Returns False if invalid.                                                                                                         
+        """                                                                                                                               
+        if not api_key:                                                                                                                   
+            return False                                                                                                                  
+        api_key_record = self.search([                                                                                                    
+            ('key', '=', api_key),                                                                                                        
+            ('active', '=', True)                                                                                                         
+        ], limit=1)                                                                                                                       
+        if api_key_record:                                                                                                                
+            api_key_record.sudo().write({'last_used': fields.Datetime.now()})                                                             
+            return api_key_record                                                                                                         
+        return False        
