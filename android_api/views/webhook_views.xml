@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Webhook Form View -->
+    <record id="view_android_api_webhook_form" model="ir.ui.view">
+        <field name="name">android.api.webhook.form</field>
+        <field name="model">android.api.webhook</field>
+        <field name="arch" type="xml">
+            <form string="Webhook">
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="test_webhook" type="object" class="oe_stat_button" icon="fa-bolt"
+                                string="Test Webhook" confirm="Send a test notification?"/>
+                    </div>
+                    <widget name="web_ribbon" title="Archived" bg_color="bg-danger" invisible="active"/>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="url" widget="url"/>
+                            <field name="secret"/>
+                            <field name="active"/>
+                        </group>
+                        <group>
+                            <field name="last_triggered"/>
+                            <field name="last_status"/>
+                            <field name="last_error" invisible="last_status != 'failed'"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Events" name="events">
+                            <group string="Customer Events">
+                                <field name="on_customer_create"/>
+                                <field name="on_customer_update"/>
+                            </group>
+                            <group string="Sale Order Events">
+                                <field name="on_sale_create"/>
+                                <field name="on_sale_update"/>
+                            </group>
+                            <group string="Delivery Events">
+                                <field name="on_delivery_create"/>
+                                <field name="on_delivery_update"/>
+                            </group>
+                            <group string="Payment Events">
+                                <field name="on_payment_create"/>
+                                <field name="on_payment_update"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Webhook Tree View -->
+    <record id="view_android_api_webhook_tree" model="ir.ui.view">
+        <field name="name">android.api.webhook.tree</field>
+        <field name="model">android.api.webhook</field>
+        <field name="arch" type="xml">
+            <tree string="Webhooks">
+                <field name="name"/>
+                <field name="url"/>
+                <field name="active"/>
+                <field name="last_triggered"/>
+                <field name="last_status" decoration-success="last_status == 'success'" decoration-danger="last_status == 'failed'" widget="badge"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- Webhook Action -->
+    <record id="action_android_api_webhook" model="ir.actions.act_window">
+        <field name="name">Webhooks</field>
+        <field name="res_model">android.api.webhook</field>
+        <field name="view_mode">tree,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a webhook to receive notifications
+            </p>
+            <p>
+                Configure webhooks to notify external systems when records are created or updated.
+            </p>
+        </field>
+    </record>
+
+    <!-- Menu Items -->
+    <menuitem id="menu_android_api_root"
+              name="Android API"
+              sequence="100"/>
+
+    <menuitem id="menu_android_api_config"
+              name="Configuration"
+              parent="menu_android_api_root"
+              sequence="10"/>
+
+    <menuitem id="menu_android_api_webhook"
+              name="Webhooks"
+              parent="menu_android_api_config"
+              action="action_android_api_webhook"
+              sequence="10"/>
+</odoo>

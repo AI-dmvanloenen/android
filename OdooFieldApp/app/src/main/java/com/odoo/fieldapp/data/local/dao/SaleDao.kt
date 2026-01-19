@@ -20,6 +20,18 @@ interface SaleDao {
     fun getAllSales(): Flow<List<SaleEntity>>
 
     /**
+     * Get all sales once (non-reactive, for loading state)
+     */
+    @Query("SELECT * FROM sales ORDER BY dateOrder DESC")
+    suspend fun getAllSalesOnce(): List<SaleEntity>
+
+    /**
+     * Get all sale IDs (for sync deletion check)
+     */
+    @Query("SELECT id FROM sales")
+    suspend fun getAllSaleIds(): List<Int>
+
+    /**
      * Get a single sale by ID (Odoo record ID)
      */
     @Query("SELECT * FROM sales WHERE id = :saleId")
@@ -55,6 +67,24 @@ interface SaleDao {
      */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSales(sales: List<SaleEntity>)
+
+    /**
+     * Delete sales not in the given set of IDs
+     * Used during sync to remove records deleted on the server
+     */
+    @Query("DELETE FROM sales WHERE id NOT IN (:ids)")
+    suspend fun deleteSalesNotIn(ids: Set<Int>)
+
+    /**
+     * Atomic sync operation: deletes stale records and inserts new ones in a single transaction
+     * Ensures database consistency if sync is interrupted
+     */
+    @Transaction
+    suspend fun syncSales(sales: List<SaleEntity>) {
+        val incomingIds = sales.map { it.id }.toSet()
+        deleteSalesNotIn(incomingIds)
+        insertSales(sales)
+    }
 
     /**
      * Update a sale

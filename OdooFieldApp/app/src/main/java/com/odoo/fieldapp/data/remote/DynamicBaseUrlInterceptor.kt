@@ -1,7 +1,6 @@
 package com.odoo.fieldapp.data.remote
 
-import com.odoo.fieldapp.data.repository.ApiKeyProviderImpl
-import kotlinx.coroutines.runBlocking
+import com.odoo.fieldapp.data.repository.ApiKeyProvider
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Interceptor
 import okhttp3.Response
@@ -13,18 +12,20 @@ import javax.inject.Singleton
  * based on the server URL stored in settings.
  *
  * Supports any custom server URL (e.g., mycompany.odoo.com, custom.ownserver.com)
+ *
+ * Uses cached base URL to avoid blocking the network thread.
  */
 @Singleton
 class DynamicBaseUrlInterceptor @Inject constructor(
-    private val apiKeyProvider: ApiKeyProviderImpl
+    private val apiKeyProvider: ApiKeyProvider
 ) : Interceptor {
 
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
         val originalUrl = originalRequest.url
 
-        // Get the base URL from settings (blocking call)
-        val baseUrl = runBlocking { apiKeyProvider.getBaseUrl() }
+        // Get the cached base URL (non-blocking)
+        val baseUrl = apiKeyProvider.getCachedBaseUrl()
         val newBaseUrl = baseUrl.toHttpUrlOrNull()
 
         if (newBaseUrl == null) {

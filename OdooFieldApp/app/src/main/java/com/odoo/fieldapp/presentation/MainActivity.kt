@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.Icon
@@ -46,6 +47,11 @@ sealed class BottomNavItem(
         title = "Sales",
         icon = Icons.Default.ShoppingCart
     )
+    object Deliveries : BottomNavItem(
+        route = Screen.DeliveriesList.route,
+        title = "Deliveries",
+        icon = Icons.Default.LocalShipping
+    )
 }
 
 /**
@@ -77,13 +83,15 @@ fun MainScreen() {
     // Bottom navigation items
     val bottomNavItems = listOf(
         BottomNavItem.Customers,
-        BottomNavItem.Sales
+        BottomNavItem.Sales,
+        BottomNavItem.Deliveries
     )
 
     // Only show bottom nav on list screens (not detail or settings)
     val showBottomNav = currentDestination?.route in listOf(
         Screen.CustomerList.route,
-        Screen.SalesList.route
+        Screen.SalesList.route,
+        Screen.DeliveriesList.route
     )
 
     Scaffold(

@@ -8,10 +8,15 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 /**
- * Date formatter for Odoo API (ISO format: 2025-04-11 or 2025-04-11 10:30:00)
+ * Thread-safe date formatters for Odoo API (ISO format: 2025-04-11 or 2025-04-11 10:30:00)
+ * SimpleDateFormat is not thread-safe, so we use ThreadLocal to provide each thread its own instance.
  */
-private val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-private val dateTimeFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+private val dateFormatter = ThreadLocal.withInitial {
+    SimpleDateFormat("yyyy-MM-dd", Locale.US)
+}
+private val dateTimeFormatter = ThreadLocal.withInitial {
+    SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+}
 
 /**
  * Convert SaleResponse from API to domain Sale model
@@ -39,9 +44,9 @@ private fun parseDate(dateStr: String?): Date? {
     return try {
         // Try datetime format first (more specific)
         if (dateStr.contains(" ")) {
-            dateTimeFormatter.parse(dateStr)
+            dateTimeFormatter.get()!!.parse(dateStr)
         } else {
-            dateFormatter.parse(dateStr)
+            dateFormatter.get()!!.parse(dateStr)
         }
     } catch (e: Exception) {
         null
@@ -54,7 +59,7 @@ private fun parseDate(dateStr: String?): Date? {
 fun Sale.toRequest(): SaleRequest {
     return SaleRequest(
         name = name,
-        dateOrder = dateOrder?.let { dateFormatter.format(it) },
+        dateOrder = dateOrder?.let { dateFormatter.get()!!.format(it) },
         amountTotal = amountTotal,
         partnerId = partnerId
     )

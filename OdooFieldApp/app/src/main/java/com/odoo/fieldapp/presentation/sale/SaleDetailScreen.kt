@@ -24,6 +24,7 @@ import java.util.*
 @Composable
 fun SaleDetailScreen(
     sale: Sale?,
+    customerName: String? = null,
     onBackClick: () -> Unit
 ) {
     Scaffold(
@@ -65,8 +66,8 @@ fun SaleDetailScreen(
                 SaleInfoCard(sale)
 
                 // Customer information
-                if (sale.partnerId != null || sale.partnerName != null) {
-                    CustomerInfoCard(sale)
+                if (sale.partnerId != null || customerName != null) {
+                    CustomerInfoCard(sale = sale, customerName = customerName)
                 }
 
                 // System information
@@ -148,7 +149,7 @@ private fun SaleInfoCard(sale: Sale) {
 }
 
 @Composable
-private fun CustomerInfoCard(sale: Sale) {
+private fun CustomerInfoCard(sale: Sale, customerName: String?) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
@@ -163,7 +164,9 @@ private fun CustomerInfoCard(sale: Sale) {
 
             Divider()
 
-            sale.partnerName?.let { name ->
+            // Show customer name (from lookup) or fall back to partner name from sale
+            val displayName = customerName ?: sale.partnerName
+            displayName?.let { name ->
                 SaleDetailRow(
                     icon = Icons.Default.Person,
                     label = "Customer Name",

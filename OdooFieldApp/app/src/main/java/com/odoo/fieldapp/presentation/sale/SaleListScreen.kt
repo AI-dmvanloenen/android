@@ -267,7 +267,7 @@ fun SaleEmptyState(
     ) {
         Icon(
             imageVector = if (searchQuery.isEmpty()) Icons.Default.ShoppingCart else Icons.Default.Search,
-            contentDescription = null,
+            contentDescription = if (searchQuery.isEmpty()) "No sales" else "No results",
             modifier = Modifier.size(64.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -299,7 +299,7 @@ fun SaleEmptyState(
         if (searchQuery.isEmpty()) {
             Spacer(modifier = Modifier.height(16.dp))
             Button(onClick = onSyncClick) {
-                Icon(Icons.Default.Refresh, contentDescription = null)
+                Icon(Icons.Default.Refresh, contentDescription = "Sync")
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Sync Now")
             }
@@ -331,7 +331,7 @@ fun SaleSuccessMessage(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     Icons.Default.CheckCircle,
-                    contentDescription = null,
+                    contentDescription = "Success",
                     tint = MaterialTheme.colorScheme.onPrimaryContainer
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -375,7 +375,7 @@ fun SaleErrorMessage(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     Icons.Default.Warning,
-                    contentDescription = null,
+                    contentDescription = "Error",
                     tint = MaterialTheme.colorScheme.onErrorContainer
                 )
                 Spacer(modifier = Modifier.width(8.dp))

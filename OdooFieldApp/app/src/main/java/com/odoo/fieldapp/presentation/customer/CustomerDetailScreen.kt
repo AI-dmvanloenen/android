@@ -1,5 +1,6 @@
 package com.odoo.fieldapp.presentation.customer
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -7,23 +8,29 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.odoo.fieldapp.domain.model.Customer
+import com.odoo.fieldapp.domain.model.Sale
+import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
 
 /**
  * Customer Detail Screen
- * 
+ *
  * Displays detailed information about a selected customer
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomerDetailScreen(
     customer: Customer?,
-    onBackClick: () -> Unit
+    sales: List<Sale> = emptyList(),
+    onBackClick: () -> Unit,
+    onSaleClick: (Sale) -> Unit = {}
 ) {
     Scaffold(
         topBar = {
@@ -172,7 +179,135 @@ fun CustomerDetailScreen(
                         )
                     }
                 }
+
+                // Sales Orders
+                SalesOrdersCard(
+                    sales = sales,
+                    onSaleClick = onSaleClick
+                )
             }
+        }
+    }
+}
+
+/**
+ * Sales Orders card showing all orders for this customer
+ */
+@Composable
+private fun SalesOrdersCard(
+    sales: List<Sale>,
+    onSaleClick: (Sale) -> Unit
+) {
+    val dateFormatter = remember { SimpleDateFormat("MMM dd, yyyy", Locale.US) }
+    val currencyFormatter = remember { NumberFormat.getCurrencyInstance(Locale.US) }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Sales Orders",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = "${sales.size} order${if (sales.size != 1) "s" else ""}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Divider()
+
+            if (sales.isEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = "No sales orders",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                sales.forEach { sale ->
+                    SaleOrderItem(
+                        sale = sale,
+                        dateFormatter = dateFormatter,
+                        currencyFormatter = currencyFormatter,
+                        onClick = { onSaleClick(sale) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Single sale order item in the list
+ */
+@Composable
+private fun SaleOrderItem(
+    sale: Sale,
+    dateFormatter: SimpleDateFormat,
+    currencyFormatter: NumberFormat,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = MaterialTheme.shapes.small
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = sale.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                sale.dateOrder?.let { date ->
+                    Text(
+                        text = dateFormatter.format(date),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            sale.amountTotal?.let { amount ->
+                Text(
+                    text = currencyFormatter.format(amount),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = "View details",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

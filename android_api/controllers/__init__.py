@@ -1,3 +1,6 @@
 # -*- coding: utf-8 -*-
+from . import auth
 from . import customer_controller
 from . import sales_controller
+from . import delivery_controller
+from . import payment_controller

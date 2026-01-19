@@ -36,7 +36,8 @@ fun CustomerListScreen(
     onSyncClick: () -> Unit,
     onCustomerClick: (Customer) -> Unit,
     onSettingsClick: () -> Unit,
-    onClearSyncState: () -> Unit
+    onClearSyncState: () -> Unit,
+    onCreateClick: () -> Unit = {}
 ) {
     Scaffold(
         topBar = {
@@ -66,6 +67,11 @@ fun CustomerListScreen(
                     }
                 }
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = onCreateClick) {
+                Icon(Icons.Default.Add, contentDescription = "Create Customer")
+            }
         }
     ) { paddingValues ->
         Column(
@@ -260,7 +266,7 @@ fun EmptyState(
     ) {
         Icon(
             imageVector = if (searchQuery.isEmpty()) Icons.Default.Person else Icons.Default.Search,
-            contentDescription = null,
+            contentDescription = if (searchQuery.isEmpty()) "No customers" else "No results",
             modifier = Modifier.size(64.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -292,7 +298,7 @@ fun EmptyState(
         if (searchQuery.isEmpty()) {
             Spacer(modifier = Modifier.height(16.dp))
             Button(onClick = onSyncClick) {
-                Icon(Icons.Default.Refresh, contentDescription = null)
+                Icon(Icons.Default.Refresh, contentDescription = "Sync")
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Sync Now")
             }
@@ -324,7 +330,7 @@ fun SuccessMessage(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     Icons.Default.CheckCircle,
-                    contentDescription = null,
+                    contentDescription = "Success",
                     tint = MaterialTheme.colorScheme.onPrimaryContainer
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -368,7 +374,7 @@ fun ErrorMessage(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     Icons.Default.Warning,
-                    contentDescription = null,
+                    contentDescription = "Error",
                     tint = MaterialTheme.colorScheme.onErrorContainer
                 )
                 Spacer(modifier = Modifier.width(8.dp))

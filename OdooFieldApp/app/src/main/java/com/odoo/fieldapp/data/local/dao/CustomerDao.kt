@@ -18,7 +18,19 @@ interface CustomerDao {
      */
     @Query("SELECT * FROM customers ORDER BY name ASC")
     fun getAllCustomers(): Flow<List<CustomerEntity>>
-    
+
+    /**
+     * Get all customers once (non-reactive, for loading state)
+     */
+    @Query("SELECT * FROM customers ORDER BY name ASC")
+    suspend fun getAllCustomersOnce(): List<CustomerEntity>
+
+    /**
+     * Get all customer IDs (for sync deletion check)
+     */
+    @Query("SELECT id FROM customers")
+    suspend fun getAllCustomerIds(): List<Int>
+
     /**
      * Get a single customer by ID (Odoo record ID)
      */
@@ -49,6 +61,17 @@ interface CustomerDao {
      */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCustomers(customers: List<CustomerEntity>)
+
+    /**
+     * Atomic sync operation: deletes stale records and inserts new ones in a single transaction
+     * Ensures database consistency if sync is interrupted
+     */
+    @Transaction
+    suspend fun syncCustomers(customers: List<CustomerEntity>) {
+        val incomingIds = customers.map { it.id }.toSet()
+        deleteCustomersNotIn(incomingIds)
+        insertCustomers(customers)
+    }
     
     /**
      * Update a customer
@@ -67,10 +90,35 @@ interface CustomerDao {
      */
     @Query("DELETE FROM customers")
     suspend fun deleteAllCustomers()
+
+    /**
+     * Delete customers not in the given set of IDs
+     * Used during sync to remove records deleted on the server
+     */
+    @Query("DELETE FROM customers WHERE id NOT IN (:ids)")
+    suspend fun deleteCustomersNotIn(ids: Set<Int>)
     
     /**
      * Get count of customers (useful for UI)
      */
     @Query("SELECT COUNT(*) FROM customers")
     fun getCustomerCount(): Flow<Int>
+
+    /**
+     * Get minimum customer ID (for generating temporary negative IDs for new customers)
+     */
+    @Query("SELECT MIN(id) FROM customers")
+    suspend fun getMinCustomerId(): Int?
+
+    /**
+     * Get customer by mobileUid (for finding local record after sync)
+     */
+    @Query("SELECT * FROM customers WHERE mobileUid = :mobileUid")
+    suspend fun getCustomerByMobileUid(mobileUid: String): CustomerEntity?
+
+    /**
+     * Delete customer by ID
+     */
+    @Query("DELETE FROM customers WHERE id = :customerId")
+    suspend fun deleteCustomerById(customerId: Int)
 }

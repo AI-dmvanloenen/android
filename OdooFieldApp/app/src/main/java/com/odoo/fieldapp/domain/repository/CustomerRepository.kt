@@ -37,10 +37,12 @@ interface CustomerRepository {
     suspend fun syncCustomersFromOdoo(): Flow<Resource<List<Customer>>>
     
     /**
-     * Create a new customer locally (for future phases)
-     * Will be marked as PENDING and synced later
+     * Create a new customer and sync to Odoo
+     *
+     * @param customer The customer to create (id will be ignored, mobileUid will be generated)
+     * @return Flow emitting Loading, then Success (with created customer including Odoo ID) or Error
      */
-    suspend fun createCustomer(customer: Customer): Result<Customer>
+    suspend fun createCustomer(customer: Customer): Flow<Resource<Customer>>
     
     /**
      * Delete a customer locally (for future phases)

@@ -2,6 +2,7 @@ package com.odoo.fieldapp.data.remote.api
 
 import com.odoo.fieldapp.data.remote.dto.CustomerRequest
 import com.odoo.fieldapp.data.remote.dto.CustomerResponse
+import com.odoo.fieldapp.data.remote.dto.DeliveryResponse
 import com.odoo.fieldapp.data.remote.dto.SaleResponse
 import retrofit2.Response
 import retrofit2.http.*
@@ -43,10 +44,16 @@ interface OdooApiService {
         @Header("Authorization") apiKey: String
     ): Response<List<SaleResponse>>
 
+    /**
+     * Fetch all deliveries from Odoo
+     * GET /deliveries
+     */
+    @GET("deliveries")
+    suspend fun getDeliveries(
+        @Header("Authorization") apiKey: String
+    ): Response<List<DeliveryResponse>>
+
     // Future endpoints:
     // @GET("payment")
     // suspend fun getPayments(@Header("Authorization") apiKey: String): Response<List<PaymentResponse>>
-
-    // @GET("delivery")
-    // suspend fun getDeliveries(@Header("Authorization") apiKey: String): Response<List<DeliveryResponse>>
 }

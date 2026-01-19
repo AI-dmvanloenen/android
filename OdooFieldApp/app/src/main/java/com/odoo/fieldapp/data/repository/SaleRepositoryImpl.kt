@@ -1,5 +1,6 @@
 package com.odoo.fieldapp.data.repository
 
+import android.util.Log
 import com.odoo.fieldapp.data.local.dao.CustomerDao
 import com.odoo.fieldapp.data.local.dao.SaleDao
 import com.odoo.fieldapp.data.local.entity.toDomain
@@ -28,6 +29,10 @@ class SaleRepositoryImpl @Inject constructor(
     private val apiService: OdooApiService,
     private val apiKeyProvider: ApiKeyProvider
 ) : SaleRepository {
+
+    companion object {
+        private const val TAG = "SaleRepository"
+    }
 
     /**
      * Get sales from local database
@@ -65,16 +70,17 @@ class SaleRepositoryImpl @Inject constructor(
      * Sync sales from Odoo API to local database
      *
      * Flow of Resource states:
-     * 1. Emit Loading
+     * 1. Emit Loading with existing local data
      * 2. Fetch from API
-     * 3. Save to local database
+     * 3. Save to local database (in transaction)
      * 4. Emit Success with updated data
      * 5. If error, emit Error with message
      */
     override suspend fun syncSalesFromOdoo(): Flow<Resource<List<Sale>>> = flow {
         try {
-            // 1. Emit loading state
-            emit(Resource.Loading(data = null))
+            // 1. Emit loading state with current local data
+            val localSales = saleDao.getAllSalesOnce()
+            emit(Resource.Loading(data = localSales.map { it.toDomain() }))
 
             // 2. Get API key
             val apiKey = apiKeyProvider.getApiKey()
@@ -89,15 +95,23 @@ class SaleRepositoryImpl @Inject constructor(
             if (response.isSuccessful) {
                 val saleResponses = response.body() ?: emptyList()
 
-                // 4. Convert API responses to domain models
-                val sales = saleResponses.map { it.toDomain() }
+                // 4. Filter out records with null IDs (prevents primary key conflicts)
+                val validResponses = saleResponses.filter { it.id != null }
 
-                // 5. Save to local database
-                val entities = sales.map { it.toEntity() }
-                saleDao.insertSales(entities)
+                // 5. Convert API responses to domain models
+                val allSales = validResponses.map { it.toDomain() }
 
-                // 6. Emit success
-                emit(Resource.Success(sales))
+                // 6. Filter out sales where customer doesn't exist locally
+                val validSales = allSales.filter { sale ->
+                    sale.partnerId == null || customerDao.getCustomerById(sale.partnerId) != null
+                }
+
+                // 7. Save to local database (atomic transaction, only sales with valid customers)
+                val entities = validSales.map { it.toEntity() }
+                saleDao.syncSales(entities)
+
+                // 8. Emit success
+                emit(Resource.Success(validSales))
             } else {
                 // API error
                 val errorMessage = when (response.code()) {
@@ -111,6 +125,9 @@ class SaleRepositoryImpl @Inject constructor(
             }
 
         } catch (e: Exception) {
+            // Log the full exception for debugging
+            Log.e(TAG, "Sale sync failed", e)
+
             // Network or other error
             val errorMessage = when {
                 e.message?.contains("Unable to resolve host") == true ->

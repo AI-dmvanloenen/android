@@ -245,7 +245,7 @@ fun SettingsScreen(
                                     Row {
                                         Icon(
                                             Icons.Default.CheckCircle,
-                                            contentDescription = null,
+                                            contentDescription = "Success",
                                             tint = MaterialTheme.colorScheme.onPrimaryContainer
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
@@ -278,7 +278,7 @@ fun SettingsScreen(
                                     Row {
                                         Icon(
                                             Icons.Default.Warning,
-                                            contentDescription = null,
+                                            contentDescription = "Error",
                                             tint = MaterialTheme.colorScheme.onErrorContainer
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))

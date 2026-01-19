@@ -1,0 +1,501 @@
+openapi: 3.0.3
+info:
+  title: Android API for Odoo
+  description: |
+    REST API endpoints for Android mobile app integration with Odoo.
+
+    ## Authentication
+    All endpoints require API key authentication via the `Authorization` header.
+    Supports both `Bearer <key>` and raw key formats.
+
+    ## Rate Limiting
+    - 100 requests per 60 seconds per API key
+    - Returns 429 when exceeded
+
+    ## Pagination
+    All GET endpoints support pagination via query parameters:
+    - `limit`: max records (default: 100, max: 1000)
+    - `offset`: records to skip (default: 0)
+
+    ## Filtering
+    GET endpoints support filtering via query parameters.
+    Common filter: `since` - ISO 8601 datetime to get records modified since.
+  version: 1.0.0
+  contact:
+    name: API Support
+
+servers:
+  - url: /
+    description: API Server
+
+security:
+  - bearerAuth: []
+  - apiKeyAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        details:
+          type: object
+          description: Additional error details
+
+    PaginatedResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+          description: Total records matching query
+        limit:
+          type: integer
+          description: Max records per page
+        offset:
+          type: integer
+          description: Records skipped
+        count:
+          type: integer
+          description: Records in this response
+
+    Customer:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        mobile_uid:
+          type: string
+          description: Unique identifier for mobile sync
+        name:
+          type: string
+        city:
+          type: string
+          nullable: true
+        tax_id:
+          type: string
+          nullable: true
+          description: Maps to Odoo vat field
+        email:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        website:
+          type: string
+          nullable: true
+        mobile_sync_date:
+          type: string
+          format: date
+          nullable: true
+        write_date:
+          type: string
+          format: date
+          nullable: true
+      required:
+        - mobile_uid
+        - name
+
+    SaleOrder:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        mobile_uid:
+          type: string
+          description: Unique identifier for mobile sync
+        name:
+          type: string
+          readOnly: true
+        date_order:
+          type: string
+          format: date-time
+          nullable: true
+        amount_total:
+          type: number
+          format: float
+          readOnly: true
+        state:
+          type: string
+          readOnly: true
+        partner_id:
+          type: integer
+        write_date:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - mobile_uid
+        - partner_id
+
+    DeliveryLine:
+      type: object
+      properties:
+        id:
+          type: integer
+        product_id:
+          type: integer
+          nullable: true
+        product_name:
+          type: string
+        quantity:
+          type: number
+          format: float
+        quantity_done:
+          type: number
+          format: float
+        uom:
+          type: string
+
+    Delivery:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        partner_id:
+          type: integer
+          nullable: true
+        scheduled_date:
+          type: string
+          format: date-time
+          nullable: true
+        state:
+          type: string
+        sale_id:
+          type: integer
+          nullable: true
+        write_date:
+          type: string
+          format: date-time
+          nullable: true
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeliveryLine'
+
+    Payment:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        mobile_uid:
+          type: string
+          description: Unique identifier for mobile sync
+        name:
+          type: string
+          readOnly: true
+        partner_id:
+          type: integer
+        amount:
+          type: number
+          format: float
+        date:
+          type: string
+          format: date
+          nullable: true
+        memo:
+          type: string
+          nullable: true
+          description: Maps to Odoo ref field
+        journal_id:
+          type: integer
+          nullable: true
+        state:
+          type: string
+          readOnly: true
+      required:
+        - mobile_uid
+        - partner_id
+        - amount
+
+paths:
+  /customer:
+    get:
+      summary: Get customers
+      description: |
+        Fetch customers with pagination and filtering.
+        Returns customers where customer_rank > 0, has sale orders, or has mobile_uid.
+      tags:
+        - Customers
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+            maximum: 1000
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: city
+          in: query
+          schema:
+            type: string
+        - name: email
+          in: query
+          schema:
+            type: string
+        - name: since
+          in: query
+          description: ISO 8601 datetime - get records modified since
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Paginated list of customers
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Customer'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Create or update customers
+      description: |
+        Batch create/update customers. Upsert by mobile_uid.
+        Max 100 records per request.
+      tags:
+        - Customers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/Customer'
+              maxItems: 100
+      responses:
+        '200':
+          description: Created/updated customers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Customer'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+        '429':
+          description: Rate limit exceeded
+
+  /sales:
+    get:
+      summary: Get sale orders
+      tags:
+        - Sales
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: partner_id
+          in: query
+          schema:
+            type: integer
+        - name: state
+          in: query
+          schema:
+            type: string
+        - name: since
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Paginated list of sale orders
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SaleOrder'
+        '401':
+          description: Unauthorized
+        '429':
+          description: Rate limit exceeded
+
+    post:
+      summary: Create or update sale orders
+      tags:
+        - Sales
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/SaleOrder'
+              maxItems: 100
+      responses:
+        '200':
+          description: Created/updated sale orders
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SaleOrder'
+        '400':
+          description: Validation error
+        '401':
+          description: Unauthorized
+        '429':
+          description: Rate limit exceeded
+
+  /deliveries:
+    get:
+      summary: Get outgoing deliveries
+      tags:
+        - Deliveries
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: partner_id
+          in: query
+          schema:
+            type: integer
+        - name: sale_id
+          in: query
+          schema:
+            type: integer
+        - name: state
+          in: query
+          schema:
+            type: string
+        - name: since
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Paginated list of deliveries with move lines
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Delivery'
+        '401':
+          description: Unauthorized
+        '429':
+          description: Rate limit exceeded
+
+  /payments:
+    post:
+      summary: Create or update payments
+      description: |
+        Batch create/update customer payments. Upsert by mobile_uid.
+        Payments are created as inbound customer payments.
+        If journal_id not provided, first bank journal is used.
+      tags:
+        - Payments
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/Payment'
+              maxItems: 100
+      responses:
+        '200':
+          description: Created/updated payments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Payment'
+        '400':
+          description: Validation error
+        '401':
+          description: Unauthorized
+        '429':
+          description: Rate limit exceeded

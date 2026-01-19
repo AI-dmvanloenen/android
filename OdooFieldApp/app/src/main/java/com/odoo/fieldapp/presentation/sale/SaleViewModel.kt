@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.odoo.fieldapp.domain.model.Resource
 import com.odoo.fieldapp.domain.model.Sale
+import com.odoo.fieldapp.domain.repository.CustomerRepository
 import com.odoo.fieldapp.domain.repository.SaleRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -21,7 +22,8 @@ import javax.inject.Inject
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class SaleViewModel @Inject constructor(
-    private val saleRepository: SaleRepository
+    private val saleRepository: SaleRepository,
+    private val customerRepository: CustomerRepository
 ) : ViewModel() {
 
     // Search query
@@ -51,6 +53,10 @@ class SaleViewModel @Inject constructor(
     // Selected sale for detail view
     private val _selectedSale = MutableStateFlow<Sale?>(null)
     val selectedSale: StateFlow<Sale?> = _selectedSale.asStateFlow()
+
+    // Customer name for the selected sale
+    private val _customerName = MutableStateFlow<String?>(null)
+    val customerName: StateFlow<String?> = _customerName.asStateFlow()
 
     /**
      * Update search query
@@ -90,15 +96,25 @@ class SaleViewModel @Inject constructor(
      */
     fun clearSelectedSale() {
         _selectedSale.value = null
+        _customerName.value = null
     }
 
     /**
      * Load sale by ID (Odoo record ID)
+     * Also loads the customer name if the sale has a partner_id
      */
     fun loadSaleById(saleId: Int) {
         viewModelScope.launch {
             val sale = saleRepository.getSaleById(saleId)
             _selectedSale.value = sale
+
+            // Load customer name if sale has a partner_id
+            if (sale?.partnerId != null) {
+                val customer = customerRepository.getCustomerById(sale.partnerId)
+                _customerName.value = customer?.name
+            } else {
+                _customerName.value = null
+            }
         }
     }
 

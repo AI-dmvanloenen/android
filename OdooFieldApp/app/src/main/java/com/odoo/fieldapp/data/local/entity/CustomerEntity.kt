@@ -30,7 +30,8 @@ data class CustomerEntity(
     val website: String?,
     val date: Long?,              // Stored as timestamp
     val syncState: String,        // Stored as String (SYNCED, PENDING, etc.)
-    val lastModified: Long        // Stored as timestamp
+    val lastModified: Long,       // Stored as timestamp
+    val mobileUid: String? = null // UUID for locally-created customers
 )
 
 /**
@@ -47,7 +48,8 @@ fun CustomerEntity.toDomain(): Customer {
         website = website,
         date = date?.let { Date(it) },
         syncState = SyncState.valueOf(syncState),
-        lastModified = Date(lastModified)
+        lastModified = Date(lastModified),
+        mobileUid = mobileUid
     )
 }
 
@@ -65,6 +67,7 @@ fun Customer.toEntity(): CustomerEntity {
         website = website,
         date = date?.time,
         syncState = syncState.name,
-        lastModified = lastModified.time
+        lastModified = lastModified.time,
+        mobileUid = mobileUid
     )
 }

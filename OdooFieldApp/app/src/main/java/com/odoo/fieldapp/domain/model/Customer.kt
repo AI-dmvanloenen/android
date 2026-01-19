@@ -16,7 +16,8 @@ data class Customer(
     val website: String?,
     val date: Date?,
     val syncState: SyncState,
-    val lastModified: Date
+    val lastModified: Date,
+    val mobileUid: String? = null  // UUID for locally-created customers
 )
 
 /**
