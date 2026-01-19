@@ -52,7 +52,7 @@ class CustomerController(http.Controller):
             if not isinstance(payload, list):
                 return Response("Request body must be a JSON array", status=400)
 
-            partners_env = request.env['res.partner'].sudo()
+            partners_env = request.env['res.partner'].sudo().with_context(active_test=False)
             created_customers = []
 
             for customer_data in payload:

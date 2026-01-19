@@ -1,5 +1,6 @@
 package com.odoo.fieldapp.data.repository
 
+import com.odoo.fieldapp.data.local.dao.CustomerDao
 import com.odoo.fieldapp.data.local.dao.SaleDao
 import com.odoo.fieldapp.data.local.entity.toDomain
 import com.odoo.fieldapp.data.local.entity.toEntity
@@ -23,6 +24,7 @@ import javax.inject.Singleton
 @Singleton
 class SaleRepositoryImpl @Inject constructor(
     private val saleDao: SaleDao,
+    private val customerDao: CustomerDao,
     private val apiService: OdooApiService,
     private val apiKeyProvider: ApiKeyProvider
 ) : SaleRepository {
