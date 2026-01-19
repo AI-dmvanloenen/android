@@ -4,6 +4,7 @@ from odoo import http
 from odoo.http import request, Response
 from odoo.exceptions import UserError
 
+from datetime import datetime
 import json
 import logging
 
@@ -106,8 +107,6 @@ class CustomerController(http.Controller):
         }
 
     def __dict_to_partner_vals(self, data):
-        from datetime import datetime
-
         vals = {
             'name': data.get('name'),
             'mobile_uid': data.get('mobile_uid'),
@@ -145,5 +144,5 @@ class CustomerController(http.Controller):
             request.env.uid = user_id
             return True
         else:
-            _logger.warning(f"Failed API authentication! Authorization: {api_key}")
+            _logger.warning("Failed API authentication! Invalid API key")
             return False

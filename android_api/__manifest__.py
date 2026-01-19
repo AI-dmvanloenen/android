@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Android API',
-    'version': '18.0.1.4.0',
+    'version': '18.0.5.0.0',
     'category': 'Technical',
     'summary': 'REST API endpoints for Android app integration',
     'description': """
@@ -18,8 +18,6 @@
     'website': 'https://www.yourcompany.com',
     'depends': ['base', 'contacts'],
     'data': [
-        'security/security.xml',
-        'security/ir.model.access.csv',
         'views/res_partner_views.xml',
     ],
     'installable': True,

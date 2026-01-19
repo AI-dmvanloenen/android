@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<odoo>
-    <!-- API Manager Group -->
-    <record id="group_android_api_manager" model="res.groups">
-        <field name="name">Android API Manager</field>
-        <field name="category_id" ref="base.module_category_technical_settings"/>
-        <field name="comment">Users in this group can manage Android API keys.</field>
-    </record>
-</odoo>
