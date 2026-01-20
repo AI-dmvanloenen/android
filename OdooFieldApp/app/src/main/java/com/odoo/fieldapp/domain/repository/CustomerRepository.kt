@@ -43,7 +43,25 @@ interface CustomerRepository {
      * @return Flow emitting Loading, then Success (with created customer including Odoo ID) or Error
      */
     suspend fun createCustomer(customer: Customer): Flow<Resource<Customer>>
-    
+
+    /**
+     * Update customer GPS location coordinates
+     *
+     * Updates the customer's latitude and longitude both locally and syncs to Odoo.
+     * Location is saved locally first, then synced to Odoo if online.
+     * If sync fails, the customer remains marked as PENDING for later sync.
+     *
+     * @param customerId The Odoo record ID of the customer
+     * @param latitude GPS latitude coordinate (-90 to 90)
+     * @param longitude GPS longitude coordinate (-180 to 180)
+     * @return Flow emitting Loading, then Success (with updated customer) or Error
+     */
+    suspend fun updateCustomerLocation(
+        customerId: Int,
+        latitude: Double,
+        longitude: Double
+    ): Flow<Resource<Customer>>
+
     /**
      * Delete a customer locally (for future phases)
      */

@@ -5,3 +5,4 @@ from . import sales_controller
 from . import delivery_controller
 from . import payment_controller
 from . import product_controller
+from . import visit_controller

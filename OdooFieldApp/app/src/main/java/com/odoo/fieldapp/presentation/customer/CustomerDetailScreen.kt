@@ -19,6 +19,8 @@ import androidx.compose.ui.unit.dp
 import com.odoo.fieldapp.domain.model.Customer
 import com.odoo.fieldapp.domain.model.Delivery
 import com.odoo.fieldapp.domain.model.Sale
+import com.odoo.fieldapp.domain.model.SyncState
+import com.odoo.fieldapp.domain.model.Visit
 import com.odoo.fieldapp.presentation.components.DetailRow
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
@@ -35,13 +37,86 @@ fun CustomerDetailScreen(
     customer: Customer?,
     sales: List<Sale> = emptyList(),
     deliveries: List<Delivery> = emptyList(),
+    visits: List<Visit> = emptyList(),
     onBackClick: () -> Unit,
     onSaleClick: (Sale) -> Unit = {},
-    onDeliveryClick: (Delivery) -> Unit = {}
+    onDeliveryClick: (Delivery) -> Unit = {},
+    onAddVisitClick: () -> Unit = {},
+    locationState: com.odoo.fieldapp.domain.model.Resource<Unit>? = null,
+    showLocationConfirmDialog: Boolean = false,
+    isCapturingLocation: Boolean = false,
+    onCaptureLocationClick: () -> Unit = {},
+    onConfirmLocationUpdate: () -> Unit = {},
+    onDismissLocationDialog: () -> Unit = {},
+    onClearLocationState: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
+
+    // Show snackbar for location state changes
+    androidx.compose.runtime.LaunchedEffect(locationState) {
+        when (locationState) {
+            is com.odoo.fieldapp.domain.model.Resource.Success -> {
+                snackbarHostState.showSnackbar(
+                    message = locationState.message ?: "Location captured successfully",
+                    duration = androidx.compose.material3.SnackbarDuration.Short
+                )
+                onClearLocationState()
+            }
+            is com.odoo.fieldapp.domain.model.Resource.Error -> {
+                snackbarHostState.showSnackbar(
+                    message = locationState.message ?: "Failed to capture location",
+                    duration = androidx.compose.material3.SnackbarDuration.Long
+                )
+                onClearLocationState()
+            }
+            else -> { /* Ignore Loading and null */ }
+        }
+    }
+
+    // Location confirmation dialog
+    if (showLocationConfirmDialog && customer != null) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = onDismissLocationDialog,
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.LocationOn,
+                    contentDescription = null
+                )
+            },
+            title = {
+                Text(
+                    text = if (customer.latitude != null && customer.longitude != null) {
+                        "Update Location?"
+                    } else {
+                        "Capture Location?"
+                    }
+                )
+            },
+            text = {
+                Text(
+                    if (customer.latitude != null && customer.longitude != null) {
+                        "Are you sure you want to update/overwrite the GPS location of this customer?"
+                    } else {
+                        "Capture the current GPS location for this customer?"
+                    }
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = onConfirmLocationUpdate) {
+                    Text("Confirm")
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = onDismissLocationDialog) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Customer Details") },
@@ -51,6 +126,19 @@ fun CustomerDetailScreen(
                     }
                 }
             )
+        },
+        floatingActionButton = {
+            if (customer != null) {
+                FloatingActionButton(
+                    onClick = onAddVisitClick,
+                    containerColor = MaterialTheme.colorScheme.primary
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Log Visit"
+                    )
+                }
+            }
         }
     ) { paddingValues ->
         if (customer == null) {
@@ -172,6 +260,126 @@ fun CustomerDetailScreen(
                     }
                 }
 
+                // GPS Location Card
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "GPS Location",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+
+                        Divider()
+
+                        // Show location coordinates if available
+                        if (customer.latitude != null && customer.longitude != null) {
+                            DetailRow(
+                                icon = Icons.Default.LocationOn,
+                                label = "Latitude",
+                                value = String.format("%.6f", customer.latitude)
+                            )
+                            DetailRow(
+                                icon = Icons.Default.LocationOn,
+                                label = "Longitude",
+                                value = String.format("%.6f", customer.longitude)
+                            )
+
+                            // View on Map button
+                            val isValidCoordinate = customer.latitude!! in -90.0..90.0 &&
+                                    customer.longitude!! in -180.0..180.0
+                            OutlinedButton(
+                                onClick = {
+                                    if (isValidCoordinate) {
+                                        val geoUri = "geo:${customer.latitude},${customer.longitude}?q=${customer.latitude},${customer.longitude}(${Uri.encode(customer.name)})"
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(geoUri))
+                                        context.startActivity(intent)
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = isValidCoordinate
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Map,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("View on Map")
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Update Location button
+                            Button(
+                                onClick = onCaptureLocationClick,
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = !isCapturingLocation
+                            ) {
+                                if (isCapturingLocation) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        strokeWidth = 2.dp
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Capturing Location...")
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.MyLocation,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Update Location")
+                                }
+                            }
+                        } else {
+                            // No location yet
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Text(
+                                    text = "No location captured yet",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            // Capture Location button
+                            Button(
+                                onClick = onCaptureLocationClick,
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = !isCapturingLocation
+                            ) {
+                                if (isCapturingLocation) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        strokeWidth = 2.dp
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Capturing Location...")
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.LocationOn,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Capture Location")
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Sales Orders
                 SalesOrdersCard(
                     sales = sales,
@@ -183,6 +391,9 @@ fun CustomerDetailScreen(
                     deliveries = deliveries,
                     onDeliveryClick = onDeliveryClick
                 )
+
+                // Visits
+                VisitsCard(visits = visits)
 
                 // Additional information
                 Card(modifier = Modifier.fillMaxWidth()) {
@@ -482,4 +693,132 @@ private fun DeliveryItem(
             )
         }
     }
+}
+
+/**
+ * Visits card showing all visits logged for this customer
+ */
+@Composable
+private fun VisitsCard(visits: List<Visit>) {
+    val dateFormatter = remember { SimpleDateFormat("MMM dd, yyyy 'at' h:mm a", Locale.getDefault()) }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Visits",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = "${visits.size} visit${if (visits.size != 1) "s" else ""}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Divider()
+
+            if (visits.isEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = "No visits logged yet",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                visits.forEach { visit ->
+                    VisitItem(
+                        visit = visit,
+                        dateFormatter = dateFormatter
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Single visit item in the list
+ */
+@Composable
+private fun VisitItem(
+    visit: Visit,
+    dateFormatter: SimpleDateFormat
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = MaterialTheme.shapes.small
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = dateFormatter.format(visit.visitDatetime),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+
+                // Sync state badge (only show if PENDING or ERROR)
+                if (visit.syncState == SyncState.PENDING || visit.syncState == SyncState.ERROR) {
+                    Surface(
+                        color = when (visit.syncState) {
+                            SyncState.PENDING -> MaterialTheme.colorScheme.secondaryContainer
+                            SyncState.ERROR -> MaterialTheme.colorScheme.errorContainer
+                            else -> MaterialTheme.colorScheme.surfaceVariant
+                        },
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Text(
+                            text = when (visit.syncState) {
+                                SyncState.PENDING -> "Syncing..."
+                                SyncState.ERROR -> "Error"
+                                else -> ""
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            color = when (visit.syncState) {
+                                SyncState.PENDING -> MaterialTheme.colorScheme.onSecondaryContainer
+                                SyncState.ERROR -> MaterialTheme.colorScheme.onErrorContainer
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    }
+                }
+            }
+
+            visit.memo?.let { memo ->
+                if (memo.isNotBlank()) {
+                    Text(
+                        text = memo,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+    Spacer(modifier = Modifier.height(8.dp))
 }

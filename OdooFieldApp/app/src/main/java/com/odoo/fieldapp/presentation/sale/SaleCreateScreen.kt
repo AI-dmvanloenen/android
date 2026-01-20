@@ -188,28 +188,11 @@ fun SaleCreateScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     // Header row
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Order Lines",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Medium
-                        )
-                        TextButton(
-                            onClick = onShowProductPicker
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Add Product")
-                        }
-                    }
+                    Text(
+                        text = "Order Lines",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Medium
+                    )
 
                     // Lines error
                     linesError?.let { error ->
@@ -243,6 +226,20 @@ fun SaleCreateScreen(
                                 onDecrementQuantity = { onDecrementQuantity(item.localId) },
                                 onRemove = { onRemoveLineItem(item.localId) }
                             )
+                        }
+
+                        // Add Product button after line items
+                        TextButton(
+                            onClick = onShowProductPicker,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Add Product")
                         }
                     }
 
@@ -372,12 +369,18 @@ private fun SaleLineItemRow(
             ) {
                 IconButton(
                     onClick = onDecrementQuantity,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(32.dp),
+                    enabled = item.quantity > 1  // Disable when quantity would become 0
                 ) {
                     Icon(
                         imageVector = Icons.Default.Remove,
                         contentDescription = "Decrease quantity",
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(18.dp),
+                        tint = if (item.quantity > 1) {
+                            MaterialTheme.colorScheme.onSurface
+                        } else {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        }
                     )
                 }
                 Text(

@@ -13,6 +13,9 @@ import com.odoo.fieldapp.data.remote.dto.SalePaginatedResponse
 import com.odoo.fieldapp.data.remote.dto.SaleRequest
 import com.odoo.fieldapp.data.remote.dto.ValidateDeliveryRequest
 import com.odoo.fieldapp.data.remote.dto.ValidateDeliveryResponse
+import com.odoo.fieldapp.data.remote.dto.VisitCreateResponse
+import com.odoo.fieldapp.data.remote.dto.VisitPaginatedResponse
+import com.odoo.fieldapp.data.remote.dto.VisitRequest
 import retrofit2.Response
 import retrofit2.http.*
 
@@ -135,4 +138,31 @@ interface OdooApiService {
         @Header("Authorization") apiKey: String,
         @Query("since") since: String? = null
     ): Response<ProductPaginatedResponse>
+
+    /**
+     * Fetch all visits from Odoo
+     * GET /visits
+     * Returns paginated response wrapper
+     *
+     * @param since Optional ISO 8601 datetime to fetch only records modified since this time
+     * @param partnerId Optional filter by customer ID
+     */
+    @GET("visits")
+    suspend fun getVisits(
+        @Header("Authorization") apiKey: String,
+        @Query("since") since: String? = null,
+        @Query("partner_id") partnerId: Int? = null
+    ): Response<VisitPaginatedResponse>
+
+    /**
+     * Create new visits in Odoo (batch operation)
+     * POST /visits
+     *
+     * Accepts a list of visits in the request body
+     */
+    @POST("visits")
+    suspend fun createVisits(
+        @Header("Authorization") apiKey: String,
+        @Body visits: List<VisitRequest>
+    ): Response<VisitCreateResponse>
 }

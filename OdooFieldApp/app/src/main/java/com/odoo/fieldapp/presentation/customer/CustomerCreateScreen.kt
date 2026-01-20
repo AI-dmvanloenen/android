@@ -31,6 +31,9 @@ fun CustomerCreateScreen(
     phone: String,
     website: String,
     nameError: String?,
+    emailError: String? = null,
+    phoneError: String? = null,
+    websiteError: String? = null,
     createState: Resource<Customer>?,
     onNameChange: (String) -> Unit,
     onCityChange: (String) -> Unit,
@@ -201,6 +204,8 @@ fun CustomerCreateScreen(
                         leadingIcon = {
                             Icon(Icons.Default.Email, contentDescription = null)
                         },
+                        isError = emailError != null,
+                        supportingText = emailError?.let { { Text(it) } },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(
@@ -219,6 +224,8 @@ fun CustomerCreateScreen(
                         leadingIcon = {
                             Icon(Icons.Default.Phone, contentDescription = null)
                         },
+                        isError = phoneError != null,
+                        supportingText = phoneError?.let { { Text(it) } },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(
@@ -237,6 +244,8 @@ fun CustomerCreateScreen(
                         leadingIcon = {
                             Icon(Icons.Default.Public, contentDescription = null)
                         },
+                        isError = websiteError != null,
+                        supportingText = websiteError?.let { { Text(it) } },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(

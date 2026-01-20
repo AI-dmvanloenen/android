@@ -134,6 +134,8 @@ class CustomerController(http.Controller):
             'email': partner.email or None,
             'phone': partner.phone or None,
             'website': partner.website or None,
+            'partner_latitude': partner.partner_latitude or None,
+            'partner_longitude': partner.partner_longitude or None,
             'mobile_sync_date': format_date(partner.mobile_sync_date),
             'write_date': format_datetime(partner.write_date) if partner.write_date else None,
         }
@@ -147,6 +149,8 @@ class CustomerController(http.Controller):
             'email': data.get('email'),
             'phone': data.get('phone'),
             'website': data.get('website'),
+            'partner_latitude': data.get('partner_latitude'),
+            'partner_longitude': data.get('partner_longitude'),
             'is_company': True,
             'customer_rank': 1,
         }

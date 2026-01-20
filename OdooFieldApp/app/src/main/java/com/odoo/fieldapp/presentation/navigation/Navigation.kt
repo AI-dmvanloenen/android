@@ -1,11 +1,15 @@
 package com.odoo.fieldapp.presentation.navigation
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -23,6 +27,7 @@ import com.odoo.fieldapp.presentation.customer.CustomerCreateScreen
 import com.odoo.fieldapp.presentation.customer.CustomerDetailScreen
 import com.odoo.fieldapp.presentation.customer.CustomerListScreen
 import com.odoo.fieldapp.presentation.customer.CustomerViewModel
+import com.odoo.fieldapp.presentation.customer.VisitDialog
 import com.odoo.fieldapp.presentation.dashboard.DashboardScreen
 import com.odoo.fieldapp.presentation.dashboard.DashboardViewModel
 import com.odoo.fieldapp.presentation.delivery.DeliveryDetailScreen
@@ -287,6 +292,9 @@ fun AppNavigation(
                 val phone by viewModel.createPhone.collectAsState()
                 val website by viewModel.createWebsite.collectAsState()
                 val nameError by viewModel.nameError.collectAsState()
+                val emailError by viewModel.emailError.collectAsState()
+                val phoneError by viewModel.phoneError.collectAsState()
+                val websiteError by viewModel.websiteError.collectAsState()
                 val createState by viewModel.createState.collectAsState()
 
                 CustomerCreateScreen(
@@ -297,6 +305,9 @@ fun AppNavigation(
                     phone = phone,
                     website = website,
                     nameError = nameError,
+                    emailError = emailError,
+                    phoneError = phoneError,
+                    websiteError = websiteError,
                     createState = createState,
                     onNameChange = viewModel::onCreateNameChange,
                     onCityChange = viewModel::onCreateCityChange,
@@ -325,6 +336,47 @@ fun AppNavigation(
                 val customer by viewModel.selectedCustomer.collectAsState()
                 val salesForCustomer by viewModel.salesForCustomer.collectAsState()
                 val deliveriesForCustomer by viewModel.deliveriesForCustomer.collectAsState()
+                val visitsForCustomer by viewModel.visitsForCustomer.collectAsState()
+
+                // Visit dialog state
+                val showVisitDialog by viewModel.showVisitDialog.collectAsState()
+                val visitDatetime by viewModel.visitDatetime.collectAsState()
+                val visitMemo by viewModel.visitMemo.collectAsState()
+                val createVisitState by viewModel.createVisitState.collectAsState()
+
+                // Location state
+                val locationState by viewModel.locationState.collectAsState()
+                val needsLocationPermission by viewModel.needsLocationPermission.collectAsState()
+                val showLocationConfirmDialog by viewModel.showLocationConfirmDialog.collectAsState()
+
+                // Permission launcher for location
+                val locationPermissionLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestMultiplePermissions()
+                ) { permissions ->
+                    val fineLocationGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] ?: false
+                    val coarseLocationGranted = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
+
+                    if (fineLocationGranted || coarseLocationGranted) {
+                        // Permission granted, proceed with location capture
+                        viewModel.clearLocationPermissionRequest()
+                        viewModel.showLocationConfirmDialog()
+                    } else {
+                        // Permission denied
+                        viewModel.clearLocationPermissionRequest()
+                    }
+                }
+
+                // Handle permission request trigger
+                LaunchedEffect(needsLocationPermission) {
+                    if (needsLocationPermission) {
+                        locationPermissionLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION
+                            )
+                        )
+                    }
+                }
 
                 // Load customer when screen opens
                 if (customer == null && customerId != 0) {
@@ -335,6 +387,7 @@ fun AppNavigation(
                     customer = customer,
                     sales = salesForCustomer,
                     deliveries = deliveriesForCustomer,
+                    visits = visitsForCustomer,
                     onBackClick = {
                         viewModel.clearSelectedCustomer()
                         navController.popBackStack()
@@ -348,8 +401,37 @@ fun AppNavigation(
                         navController.navigate(
                             Screen.DeliveryDetail.createRoute(delivery.id)
                         )
-                    }
+                    },
+                    onAddVisitClick = {
+                        viewModel.showVisitDialog()
+                    },
+                    locationState = locationState,
+                    showLocationConfirmDialog = showLocationConfirmDialog,
+                    isCapturingLocation = locationState is com.odoo.fieldapp.domain.model.Resource.Loading,
+                    onCaptureLocationClick = viewModel::onCaptureLocationClick,
+                    onConfirmLocationUpdate = viewModel::captureCustomerLocation,
+                    onDismissLocationDialog = viewModel::hideLocationConfirmDialog,
+                    onClearLocationState = viewModel::clearLocationState
                 )
+
+                // Visit Dialog
+                val currentCustomer = customer
+                if (showVisitDialog && currentCustomer != null) {
+                    VisitDialog(
+                        customerName = currentCustomer.name,
+                        visitDatetime = visitDatetime,
+                        visitMemo = visitMemo,
+                        createState = createVisitState,
+                        onDismiss = {
+                            viewModel.hideVisitDialog()
+                            viewModel.clearCreateVisitState()
+                        },
+                        onMemoChange = viewModel::onVisitMemoChange,
+                        onSave = {
+                            viewModel.createVisit()
+                        }
+                    )
+                }
             }
 
             // Settings Screen
@@ -358,16 +440,25 @@ fun AppNavigation(
                 val serverUrl by viewModel.serverUrl.collectAsState()
                 val apiKey by viewModel.apiKey.collectAsState()
                 val saveState by viewModel.saveState.collectAsState()
+                val showProductListDialog by viewModel.showProductListDialog.collectAsState()
+                val products by viewModel.products.collectAsState()
+                val productSearchQuery by viewModel.productSearchQuery.collectAsState()
 
                 SettingsScreen(
                     serverUrl = serverUrl,
                     apiKey = apiKey,
                     saveState = saveState,
+                    showProductListDialog = showProductListDialog,
+                    products = products,
+                    productSearchQuery = productSearchQuery,
                     onServerUrlChange = viewModel::onServerUrlChange,
                     onApiKeyChange = viewModel::onApiKeyChange,
                     onSaveClick = viewModel::saveSettings,
                     onBackClick = { navController.popBackStack() },
-                    onClearSaveState = viewModel::clearSaveState
+                    onClearSaveState = viewModel::clearSaveState,
+                    onShowProductListDialog = viewModel::showProductListDialog,
+                    onHideProductListDialog = viewModel::hideProductListDialog,
+                    onProductSearchQueryChange = viewModel::onProductSearchQueryChange
                 )
             }
 

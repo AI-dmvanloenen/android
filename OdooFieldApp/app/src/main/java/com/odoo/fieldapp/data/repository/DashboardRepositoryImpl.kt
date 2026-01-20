@@ -13,6 +13,7 @@ import com.odoo.fieldapp.domain.repository.DeliveryRepository
 import com.odoo.fieldapp.domain.repository.PaymentRepository
 import com.odoo.fieldapp.domain.repository.ProductRepository
 import com.odoo.fieldapp.domain.repository.SaleRepository
+import com.odoo.fieldapp.domain.repository.VisitRepository
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -39,12 +40,16 @@ class DashboardRepositoryImpl @Inject constructor(
     private val saleRepository: SaleRepository,
     private val deliveryRepository: DeliveryRepository,
     private val paymentRepository: PaymentRepository,
-    private val productRepository: ProductRepository
+    private val productRepository: ProductRepository,
+    private val visitRepository: VisitRepository
 ) : DashboardRepository {
 
     companion object {
         private const val TAG = "DashboardRepository"
-        private val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        // ThreadLocal ensures thread-safety for SimpleDateFormat which is not thread-safe
+        private val dateFormatter = ThreadLocal.withInitial {
+            SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        }
     }
 
     /**
@@ -54,7 +59,7 @@ class DashboardRepositoryImpl @Inject constructor(
      * the user should restart the app or navigate away and back to the dashboard.
      */
     override fun getDashboardStats(): Flow<DashboardStats> {
-        val today = dateFormatter.format(Date())
+        val today = dateFormatter.get()!!.format(Date())
 
         // Combine delivery and payment counts (up to 5 flows per combine call)
         val deliveryStats = combine(
@@ -112,6 +117,9 @@ class DashboardRepositoryImpl @Inject constructor(
                 val productDeferred = async {
                     productRepository.syncProductsFromOdoo().first { it !is Resource.Loading }
                 }
+                val visitDeferred = async {
+                    visitRepository.syncVisitsFromOdoo().first { it !is Resource.Loading }
+                }
 
                 // Await all results
                 val customerResult = customerDeferred.await()
@@ -119,6 +127,7 @@ class DashboardRepositoryImpl @Inject constructor(
                 val deliveryResult = deliveryDeferred.await()
                 val paymentResult = paymentDeferred.await()
                 val productResult = productDeferred.await()
+                val visitResult = visitDeferred.await()
 
                 // Check for errors
                 val errors = mutableListOf<String>()
@@ -127,6 +136,7 @@ class DashboardRepositoryImpl @Inject constructor(
                 if (deliveryResult is Resource.Error) errors.add("Deliveries: ${deliveryResult.message}")
                 if (paymentResult is Resource.Error) errors.add("Payments: ${paymentResult.message}")
                 if (productResult is Resource.Error) errors.add("Products: ${productResult.message}")
+                if (visitResult is Resource.Error) errors.add("Visits: ${visitResult.message}")
 
                 if (errors.isNotEmpty()) {
                     Log.e(TAG, "Sync completed with errors: $errors")

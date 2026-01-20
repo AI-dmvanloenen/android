@@ -12,6 +12,7 @@ import com.odoo.fieldapp.data.local.dao.ProductDao
 import com.odoo.fieldapp.data.local.dao.SaleDao
 import com.odoo.fieldapp.data.local.dao.SaleLineDao
 import com.odoo.fieldapp.data.local.dao.SyncQueueDao
+import com.odoo.fieldapp.data.local.dao.VisitDao
 import com.odoo.fieldapp.data.local.entity.CustomerEntity
 import com.odoo.fieldapp.data.local.entity.DeliveryEntity
 import com.odoo.fieldapp.data.local.entity.DeliveryLineEntity
@@ -20,6 +21,7 @@ import com.odoo.fieldapp.data.local.entity.ProductEntity
 import com.odoo.fieldapp.data.local.entity.SaleEntity
 import com.odoo.fieldapp.data.local.entity.SaleLineEntity
 import com.odoo.fieldapp.data.local.entity.SyncQueueEntity
+import com.odoo.fieldapp.data.local.entity.VisitEntity
 
 /**
  * Room Database for the Odoo Field App
@@ -35,6 +37,7 @@ import com.odoo.fieldapp.data.local.entity.SyncQueueEntity
  * Version 9: Added SaleLine entity
  * Version 10: Added Product entity
  * Version 11: Added SyncQueue entity for offline operations queue
+ * Version 12: Added Visit entity; added latitude/longitude to customers table
  */
 @Database(
     entities = [
@@ -46,8 +49,9 @@ import com.odoo.fieldapp.data.local.entity.SyncQueueEntity
         PaymentEntity::class,
         ProductEntity::class,
         SyncQueueEntity::class,
+        VisitEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = true
 )
 abstract class OdooDatabase : RoomDatabase() {
@@ -60,6 +64,7 @@ abstract class OdooDatabase : RoomDatabase() {
     abstract fun paymentDao(): PaymentDao
     abstract fun productDao(): ProductDao
     abstract fun syncQueueDao(): SyncQueueDao
+    abstract fun visitDao(): VisitDao
 
     companion object {
         const val DATABASE_NAME = "odoo_field_db"
@@ -263,6 +268,39 @@ abstract class OdooDatabase : RoomDatabase() {
         }
 
         /**
+         * Migration from version 11 to 12
+         * Adds Visit table for customer visit logs
+         * Adds latitude and longitude columns to customers table
+         */
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Create visits table with foreign key to customers
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS visits (
+                        id INTEGER NOT NULL PRIMARY KEY,
+                        mobileUid TEXT,
+                        partnerId INTEGER NOT NULL,
+                        partnerName TEXT,
+                        visitDatetime INTEGER NOT NULL,
+                        memo TEXT,
+                        syncState TEXT NOT NULL,
+                        lastModified INTEGER NOT NULL,
+                        FOREIGN KEY (partnerId) REFERENCES customers(id) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+
+                // Create indices for visits table
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_visits_partnerId ON visits (partnerId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_visits_visitDatetime ON visits (visitDatetime)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_visits_mobileUid ON visits (mobileUid)")
+
+                // Add GPS location columns to customers table
+                db.execSQL("ALTER TABLE customers ADD COLUMN latitude REAL")
+                db.execSQL("ALTER TABLE customers ADD COLUMN longitude REAL")
+            }
+        }
+
+        /**
          * All database migrations
          * Add new migrations here as schema evolves
          */
@@ -274,6 +312,7 @@ abstract class OdooDatabase : RoomDatabase() {
             MIGRATION_8_9,
             MIGRATION_9_10,
             MIGRATION_10_11,
+            MIGRATION_11_12,
         )
     }
 }

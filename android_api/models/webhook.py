@@ -27,6 +27,8 @@ class AndroidApiWebhook(models.Model):
     on_delivery_update = fields.Boolean(string='Delivery Updated', default=True)
     on_payment_create = fields.Boolean(string='Payment Created', default=True)
     on_payment_update = fields.Boolean(string='Payment Updated', default=True)
+    on_visit_create = fields.Boolean(string='Visit Created', default=True)
+    on_visit_update = fields.Boolean(string='Visit Updated', default=True)
 
     # Logging
     last_triggered = fields.Datetime(string='Last Triggered', readonly=True)
@@ -112,6 +114,8 @@ class AndroidApiWebhook(models.Model):
             'delivery.updated': 'on_delivery_update',
             'payment.created': 'on_payment_create',
             'payment.updated': 'on_payment_update',
+            'visit.created': 'on_visit_create',
+            'visit.updated': 'on_visit_update',
         }
 
         field_name = event_field_map.get(event)
@@ -240,5 +244,42 @@ class AccountPaymentWebhook(models.Model):
                     'account.payment',
                     record.id,
                     {'mobile_uid': record.mobile_uid, 'name': record.name}
+                )
+        return result
+
+
+class ResPartnerVisitWebhook(models.Model):
+    _inherit = 'res.partner.visit'
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        for record in records:
+            if record.mobile_uid:
+                self.env['android.api.webhook'].notify(
+                    'visit.created',
+                    'res.partner.visit',
+                    record.id,
+                    {
+                        'mobile_uid': record.mobile_uid,
+                        'partner_id': record.partner_id.id if record.partner_id else None,
+                        'partner_name': record.partner_id.name if record.partner_id else None
+                    }
+                )
+        return records
+
+    def write(self, vals):
+        result = super().write(vals)
+        for record in self:
+            if record.mobile_uid:
+                self.env['android.api.webhook'].notify(
+                    'visit.updated',
+                    'res.partner.visit',
+                    record.id,
+                    {
+                        'mobile_uid': record.mobile_uid,
+                        'partner_id': record.partner_id.id if record.partner_id else None,
+                        'partner_name': record.partner_id.name if record.partner_id else None
+                    }
                 )
         return result

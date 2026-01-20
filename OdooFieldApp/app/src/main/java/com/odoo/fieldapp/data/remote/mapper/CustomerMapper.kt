@@ -37,7 +37,9 @@ fun CustomerResponse.toDomain(): Customer {
         },
         syncState = SyncState.SYNCED,  // Data from Odoo is already synced
         lastModified = Date(),
-        mobileUid = mobileUid
+        mobileUid = mobileUid,
+        latitude = latitude,
+        longitude = longitude
     )
 }
 
@@ -54,6 +56,8 @@ fun Customer.toRequest(): CustomerRequest {
         email = email,
         phone = phone,
         website = website,
-        date = date?.let { dateFormatter.get()!!.format(it) }
+        date = date?.let { dateFormatter.get()!!.format(it) },
+        latitude = latitude,
+        longitude = longitude
     )
 }

@@ -31,7 +31,9 @@ data class CustomerEntity(
     val date: Long?,              // Stored as timestamp
     val syncState: String,        // Stored as String (SYNCED, PENDING, etc.)
     val lastModified: Long,       // Stored as timestamp
-    val mobileUid: String? = null // UUID for locally-created customers
+    val mobileUid: String? = null, // UUID for locally-created customers
+    val latitude: Double? = null,  // GPS latitude coordinate
+    val longitude: Double? = null  // GPS longitude coordinate
 )
 
 /**
@@ -49,7 +51,9 @@ fun CustomerEntity.toDomain(): Customer {
         date = date?.let { Date(it) },
         syncState = SyncState.valueOf(syncState),
         lastModified = Date(lastModified),
-        mobileUid = mobileUid
+        mobileUid = mobileUid,
+        latitude = latitude,
+        longitude = longitude
     )
 }
 
@@ -68,6 +72,8 @@ fun Customer.toEntity(): CustomerEntity {
         date = date?.time,
         syncState = syncState.name,
         lastModified = lastModified.time,
-        mobileUid = mobileUid
+        mobileUid = mobileUid,
+        latitude = latitude,
+        longitude = longitude
     )
 }

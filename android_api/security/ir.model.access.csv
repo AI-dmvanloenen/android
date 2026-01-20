@@ -1,3 +1,5 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_android_api_webhook_admin,android.api.webhook.admin,model_android_api_webhook,base.group_system,1,1,1,1
 access_android_api_webhook_user,android.api.webhook.user,model_android_api_webhook,base.group_user,1,0,0,0
+access_res_partner_visit_admin,res.partner.visit.admin,model_res_partner_visit,base.group_system,1,1,1,1
+access_res_partner_visit_user,res.partner.visit.user,model_res_partner_visit,base.group_user,1,1,1,0

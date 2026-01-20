@@ -32,7 +32,13 @@ data class CustomerResponse(
     val odooId: Int?,   // Odoo record ID
 
     @SerializedName("mobile_uid")
-    val mobileUid: String? = null  // UUID for locally-created customers
+    val mobileUid: String? = null,  // UUID for locally-created customers
+
+    @SerializedName("partner_latitude")
+    val latitude: Double? = null,  // GPS latitude coordinate
+
+    @SerializedName("partner_longitude")
+    val longitude: Double? = null  // GPS longitude coordinate
 )
 
 /**
@@ -62,7 +68,13 @@ data class CustomerRequest(
     val website: String?,
 
     @SerializedName("date")
-    val date: String?   // ISO date string "2025-04-11"
+    val date: String?,  // ISO date string "2025-04-11"
+
+    @SerializedName("partner_latitude")
+    val latitude: Double? = null,  // GPS latitude coordinate
+
+    @SerializedName("partner_longitude")
+    val longitude: Double? = null  // GPS longitude coordinate
 )
 
 /**

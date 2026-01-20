@@ -8,7 +8,9 @@ import com.odoo.fieldapp.BuildConfig
 import com.odoo.fieldapp.data.connectivity.ConnectivityManagerNetworkMonitor
 import com.odoo.fieldapp.data.local.OdooDatabase
 import com.odoo.fieldapp.data.local.dao.CustomerDao
+import com.odoo.fieldapp.data.location.LocationServiceImpl
 import com.odoo.fieldapp.domain.connectivity.NetworkMonitor
+import com.odoo.fieldapp.domain.location.LocationService
 import com.odoo.fieldapp.data.local.dao.DeliveryDao
 import com.odoo.fieldapp.data.local.dao.DeliveryLineDao
 import com.odoo.fieldapp.data.local.dao.PaymentDao
@@ -16,6 +18,7 @@ import com.odoo.fieldapp.data.local.dao.ProductDao
 import com.odoo.fieldapp.data.local.dao.SaleDao
 import com.odoo.fieldapp.data.local.dao.SaleLineDao
 import com.odoo.fieldapp.data.local.dao.SyncQueueDao
+import com.odoo.fieldapp.data.local.dao.VisitDao
 import com.odoo.fieldapp.data.remote.DynamicBaseUrlInterceptor
 import com.odoo.fieldapp.data.remote.api.OdooApiService
 import com.odoo.fieldapp.data.repository.ApiKeyProvider
@@ -26,12 +29,14 @@ import com.odoo.fieldapp.data.repository.DeliveryRepositoryImpl
 import com.odoo.fieldapp.data.repository.PaymentRepositoryImpl
 import com.odoo.fieldapp.data.repository.ProductRepositoryImpl
 import com.odoo.fieldapp.data.repository.SaleRepositoryImpl
+import com.odoo.fieldapp.data.repository.VisitRepositoryImpl
 import com.odoo.fieldapp.domain.repository.CustomerRepository
 import com.odoo.fieldapp.domain.repository.DashboardRepository
 import com.odoo.fieldapp.domain.repository.DeliveryRepository
 import com.odoo.fieldapp.domain.repository.PaymentRepository
 import com.odoo.fieldapp.domain.repository.ProductRepository
 import com.odoo.fieldapp.domain.repository.SaleRepository
+import com.odoo.fieldapp.domain.repository.VisitRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -300,7 +305,8 @@ object AppModule {
         saleRepository: SaleRepository,
         deliveryRepository: DeliveryRepository,
         paymentRepository: PaymentRepository,
-        productRepository: ProductRepository
+        productRepository: ProductRepository,
+        visitRepository: VisitRepository
     ): DashboardRepository {
         return DashboardRepositoryImpl(
             deliveryDao,
@@ -311,7 +317,8 @@ object AppModule {
             saleRepository,
             deliveryRepository,
             paymentRepository,
-            productRepository
+            productRepository,
+            visitRepository
         )
     }
 
@@ -338,6 +345,29 @@ object AppModule {
     }
 
     /**
+     * Provide Visit DAO
+     */
+    @Provides
+    @Singleton
+    fun provideVisitDao(database: OdooDatabase): VisitDao {
+        return database.visitDao()
+    }
+
+    /**
+     * Provide VisitRepository
+     */
+    @Provides
+    @Singleton
+    fun provideVisitRepository(
+        visitDao: VisitDao,
+        customerDao: CustomerDao,
+        apiService: OdooApiService,
+        apiKeyProvider: ApiKeyProvider
+    ): VisitRepository {
+        return VisitRepositoryImpl(visitDao, customerDao, apiService, apiKeyProvider)
+    }
+
+    /**
      * Provide NetworkMonitor
      * Monitors device connectivity state for offline-first functionality
      */
@@ -345,6 +375,16 @@ object AppModule {
     @Singleton
     fun provideNetworkMonitor(@ApplicationContext context: Context): NetworkMonitor {
         return ConnectivityManagerNetworkMonitor(context)
+    }
+
+    /**
+     * Provide LocationService
+     * Provides GPS location capture functionality
+     */
+    @Provides
+    @Singleton
+    fun provideLocationService(@ApplicationContext context: Context): LocationService {
+        return LocationServiceImpl(context)
     }
 
     /**

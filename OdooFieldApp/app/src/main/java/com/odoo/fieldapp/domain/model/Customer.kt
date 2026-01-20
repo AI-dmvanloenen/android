@@ -17,7 +17,9 @@ data class Customer(
     val date: Date?,
     val syncState: SyncState,
     val lastModified: Date,
-    val mobileUid: String? = null  // UUID for locally-created customers
+    val mobileUid: String? = null,  // UUID for locally-created customers
+    val latitude: Double? = null,    // GPS latitude coordinate
+    val longitude: Double? = null    // GPS longitude coordinate
 )
 
 /**

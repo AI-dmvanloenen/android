@@ -251,6 +251,104 @@ class CustomerRepositoryImpl @Inject constructor(
     }
     
     /**
+     * Update customer GPS location coordinates
+     *
+     * Flow:
+     * 1. Get customer from database
+     * 2. Update with new location and set syncState = PENDING
+     * 3. Save to local database
+     * 4. If online and customer synced with Odoo, sync to API
+     * 5. On success: update syncState to SYNCED
+     * 6. On failure: location remains saved locally with PENDING state
+     */
+    override suspend fun updateCustomerLocation(
+        customerId: Int,
+        latitude: Double,
+        longitude: Double
+    ): Flow<Resource<Customer>> = flow {
+        // 1. Emit loading
+        emit(Resource.Loading())
+
+        // 2. Get customer from database
+        val existingCustomer = customerDao.getCustomerById(customerId)?.toDomain()
+        if (existingCustomer == null) {
+            emit(Resource.Error("Customer not found"))
+            return@flow
+        }
+
+        // 3. Update customer with new location and PENDING state
+        val updatedCustomer = existingCustomer.copy(
+            latitude = latitude,
+            longitude = longitude,
+            syncState = SyncState.PENDING,
+            lastModified = Date()
+        )
+
+        // 4. Save to local database
+        customerDao.updateCustomer(updatedCustomer.toEntity())
+        Log.d(TAG, "Customer location saved locally: customerId=$customerId, lat=$latitude, lng=$longitude")
+
+        // 5. Get API key
+        val apiKey = apiKeyProvider.getApiKey()
+        if (apiKey.isNullOrBlank()) {
+            emit(Resource.Success(updatedCustomer, "Location saved locally. Will sync when online."))
+            return@flow
+        }
+
+        // 6. Only sync to Odoo if customer has been synced (has positive ID or mobile_uid)
+        if (updatedCustomer.id <= 0 && updatedCustomer.mobileUid == null) {
+            emit(Resource.Success(updatedCustomer, "Location saved locally. Customer not yet synced."))
+            return@flow
+        }
+
+        // 7. Sync location to Odoo API
+        try {
+            // For customers with Odoo ID, we use the update endpoint
+            // For now, we'll need to use the create/update endpoint with mobile_uid
+            val request = updatedCustomer.toRequest()
+            val response = if (updatedCustomer.mobileUid != null) {
+                // Use create endpoint which handles upserts by mobile_uid
+                apiService.createCustomers(apiKey, listOf(request))
+            } else {
+                // Customer from Odoo (no mobile_uid) - use create which will update by ID
+                apiService.createCustomers(apiKey, listOf(request))
+            }
+
+            if (response.isSuccessful) {
+                // 8. Success: Update syncState to SYNCED
+                val syncedCustomer = updatedCustomer.copy(syncState = SyncState.SYNCED)
+                customerDao.updateCustomer(syncedCustomer.toEntity())
+
+                Log.d(TAG, "Customer location synced to Odoo: customerId=$customerId")
+                emit(Resource.Success(syncedCustomer, "Location captured and synced successfully"))
+            } else {
+                // API error - location remains saved locally with PENDING state
+                val errorMessage = when (response.code()) {
+                    401 -> "Authentication failed. Location saved locally."
+                    403 -> "Access denied. Location saved locally."
+                    404 -> "Endpoint not found. Location saved locally."
+                    500 -> "Odoo server error. Location saved locally."
+                    else -> "Sync failed. Location saved locally."
+                }
+                Log.w(TAG, "Customer location sync failed: $errorMessage")
+                emit(Resource.Success(updatedCustomer, errorMessage))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Customer location sync exception", e)
+
+            val errorMessage = when {
+                e.message?.contains("Unable to resolve host") == true ->
+                    "Network error. Location saved locally."
+                e.message?.contains("timeout") == true ->
+                    "Request timed out. Location saved locally."
+                else ->
+                    "Sync failed. Location saved locally."
+            }
+            emit(Resource.Success(updatedCustomer, errorMessage))
+        }
+    }
+
+    /**
      * Delete a customer (for future phases)
      */
     override suspend fun deleteCustomer(customer: Customer): Result<Unit> {

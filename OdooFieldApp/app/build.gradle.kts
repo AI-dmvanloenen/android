@@ -108,6 +108,9 @@ dependencies {
     // DataStore (for storing API key)
     implementation("androidx.datastore:datastore-preferences:1.0.0")
 
+    // Google Play Services - Location
+    implementation("com.google.android.gms:play-services-location:21.1.0")
+
     // Testing
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")

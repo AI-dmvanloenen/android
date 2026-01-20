@@ -2,14 +2,17 @@ package com.odoo.fieldapp.presentation.customer
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.odoo.fieldapp.domain.location.LocationService
 import com.odoo.fieldapp.domain.model.Customer
 import com.odoo.fieldapp.domain.model.Delivery
 import com.odoo.fieldapp.domain.model.Resource
 import com.odoo.fieldapp.domain.model.Sale
 import com.odoo.fieldapp.domain.model.SyncState
+import com.odoo.fieldapp.domain.model.Visit
 import com.odoo.fieldapp.domain.repository.CustomerRepository
 import com.odoo.fieldapp.domain.repository.DeliveryRepository
 import com.odoo.fieldapp.domain.repository.SaleRepository
+import com.odoo.fieldapp.domain.repository.VisitRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -29,7 +32,9 @@ import javax.inject.Inject
 class CustomerViewModel @Inject constructor(
     private val customerRepository: CustomerRepository,
     private val saleRepository: SaleRepository,
-    private val deliveryRepository: DeliveryRepository
+    private val deliveryRepository: DeliveryRepository,
+    private val visitRepository: VisitRepository,
+    private val locationService: LocationService
 ) : ViewModel() {
     
     // Search query
@@ -62,6 +67,15 @@ class CustomerViewModel @Inject constructor(
     // Validation errors
     private val _nameError = MutableStateFlow<String?>(null)
     val nameError: StateFlow<String?> = _nameError.asStateFlow()
+
+    private val _emailError = MutableStateFlow<String?>(null)
+    val emailError: StateFlow<String?> = _emailError.asStateFlow()
+
+    private val _phoneError = MutableStateFlow<String?>(null)
+    val phoneError: StateFlow<String?> = _phoneError.asStateFlow()
+
+    private val _websiteError = MutableStateFlow<String?>(null)
+    val websiteError: StateFlow<String?> = _websiteError.asStateFlow()
 
     // Create operation state
     private val _createState = MutableStateFlow<Resource<Customer>?>(null)
@@ -116,6 +130,44 @@ class CustomerViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
+
+    // Visits for the selected customer
+    val visitsForCustomer: StateFlow<List<Visit>> = _selectedCustomer
+        .flatMapLatest { customer ->
+            if (customer != null) {
+                visitRepository.getVisitsByCustomer(customer.id)
+            } else {
+                flowOf(emptyList())
+            }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    // === Visit Dialog State ===
+    private val _showVisitDialog = MutableStateFlow(false)
+    val showVisitDialog: StateFlow<Boolean> = _showVisitDialog.asStateFlow()
+
+    private val _visitDatetime = MutableStateFlow(Date())
+    val visitDatetime: StateFlow<Date> = _visitDatetime.asStateFlow()
+
+    private val _visitMemo = MutableStateFlow("")
+    val visitMemo: StateFlow<String> = _visitMemo.asStateFlow()
+
+    private val _createVisitState = MutableStateFlow<Resource<Visit>?>(null)
+    val createVisitState: StateFlow<Resource<Visit>?> = _createVisitState.asStateFlow()
+
+    // === Location State ===
+    private val _locationState = MutableStateFlow<Resource<Unit>?>(null)
+    val locationState: StateFlow<Resource<Unit>?> = _locationState.asStateFlow()
+
+    private val _needsLocationPermission = MutableStateFlow(false)
+    val needsLocationPermission: StateFlow<Boolean> = _needsLocationPermission.asStateFlow()
+
+    private val _showLocationConfirmDialog = MutableStateFlow(false)
+    val showLocationConfirmDialog: StateFlow<Boolean> = _showLocationConfirmDialog.asStateFlow()
 
     /**
      * Update search query
@@ -194,14 +246,26 @@ class CustomerViewModel @Inject constructor(
 
     fun onCreateEmailChange(email: String) {
         _createEmail.value = email
+        // Clear error when user starts typing
+        if (_emailError.value != null) {
+            _emailError.value = null
+        }
     }
 
     fun onCreatePhoneChange(phone: String) {
         _createPhone.value = phone
+        // Clear error when user starts typing
+        if (_phoneError.value != null) {
+            _phoneError.value = null
+        }
     }
 
     fun onCreateWebsiteChange(website: String) {
         _createWebsite.value = website
+        // Clear error when user starts typing
+        if (_websiteError.value != null) {
+            _websiteError.value = null
+        }
     }
 
     /**
@@ -209,13 +273,62 @@ class CustomerViewModel @Inject constructor(
      * @return true if valid, false otherwise
      */
     private fun validateCreateForm(): Boolean {
+        var isValid = true
+
+        // Validate name (required)
         val name = _createName.value.trim()
         if (name.isBlank()) {
             _nameError.value = "Name is required"
-            return false
+            isValid = false
+        } else {
+            _nameError.value = null
         }
-        _nameError.value = null
-        return true
+
+        // Validate email format (optional but must be valid if provided)
+        val email = _createEmail.value.trim()
+        if (email.isNotBlank()) {
+            val emailRegex = Regex("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
+            if (!emailRegex.matches(email)) {
+                _emailError.value = "Invalid email format"
+                isValid = false
+            } else {
+                _emailError.value = null
+            }
+        } else {
+            _emailError.value = null
+        }
+
+        // Validate phone format (optional but must be reasonable if provided)
+        val phone = _createPhone.value.trim()
+        if (phone.isNotBlank()) {
+            // Allow digits, spaces, dashes, parentheses, and + for international format
+            val phoneRegex = Regex("^[+]?[0-9\\s\\-()]{6,20}$")
+            if (!phoneRegex.matches(phone)) {
+                _phoneError.value = "Invalid phone format"
+                isValid = false
+            } else {
+                _phoneError.value = null
+            }
+        } else {
+            _phoneError.value = null
+        }
+
+        // Validate website format (optional but must be valid URL if provided)
+        val website = _createWebsite.value.trim()
+        if (website.isNotBlank()) {
+            // Simple URL validation - must have at least a domain with TLD
+            val urlRegex = Regex("^(https?://)?[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+(/.*)?$")
+            if (!urlRegex.matches(website)) {
+                _websiteError.value = "Invalid website URL"
+                isValid = false
+            } else {
+                _websiteError.value = null
+            }
+        } else {
+            _websiteError.value = null
+        }
+
+        return isValid
     }
 
     /**
@@ -258,6 +371,9 @@ class CustomerViewModel @Inject constructor(
         _createPhone.value = ""
         _createWebsite.value = ""
         _nameError.value = null
+        _emailError.value = null
+        _phoneError.value = null
+        _websiteError.value = null
         _createState.value = null
     }
 
@@ -266,5 +382,201 @@ class CustomerViewModel @Inject constructor(
      */
     fun clearCreateState() {
         _createState.value = null
+    }
+
+    // === Visit Dialog Methods ===
+
+    /**
+     * Show visit dialog and reset fields to default
+     */
+    fun showVisitDialog() {
+        _visitDatetime.value = Date() // Default to current time
+        _visitMemo.value = ""
+        _createVisitState.value = null
+        _showVisitDialog.value = true
+    }
+
+    /**
+     * Hide visit dialog
+     */
+    fun hideVisitDialog() {
+        _showVisitDialog.value = false
+    }
+
+    /**
+     * Update visit datetime
+     */
+    fun onVisitDatetimeChange(datetime: Date) {
+        _visitDatetime.value = datetime
+    }
+
+    /**
+     * Update visit memo
+     */
+    fun onVisitMemoChange(memo: String) {
+        _visitMemo.value = memo
+    }
+
+    /**
+     * Create a new visit for the selected customer
+     */
+    fun createVisit() {
+        val customer = _selectedCustomer.value ?: return
+
+        viewModelScope.launch {
+            val visit = Visit(
+                id = 0, // Will be assigned by repository
+                mobileUid = null, // Will be generated by repository
+                partnerId = customer.id,
+                partnerName = customer.name,
+                visitDatetime = _visitDatetime.value,
+                memo = _visitMemo.value.trim().ifBlank { null },
+                syncState = SyncState.PENDING,
+                lastModified = Date()
+            )
+
+            visitRepository.createVisit(visit)
+                .collect { resource ->
+                    _createVisitState.value = resource
+                    // Close dialog on success
+                    if (resource is Resource.Success) {
+                        hideVisitDialog()
+                    }
+                }
+        }
+    }
+
+    /**
+     * Clear visit create state (dismiss success/error messages)
+     */
+    fun clearCreateVisitState() {
+        _createVisitState.value = null
+    }
+
+    // === Location Methods ===
+
+    /**
+     * Check if location permission is granted
+     */
+    fun checkLocationPermission(): Boolean {
+        return locationService.hasLocationPermission()
+    }
+
+    /**
+     * Request location permission (triggers UI permission request)
+     */
+    fun requestLocationPermission() {
+        _needsLocationPermission.value = true
+    }
+
+    /**
+     * Clear permission request flag after it's been handled
+     */
+    fun clearLocationPermissionRequest() {
+        _needsLocationPermission.value = false
+    }
+
+    /**
+     * Handle capture location button click
+     * Checks permission and shows confirmation dialog
+     */
+    fun onCaptureLocationClick() {
+        // Check permission first
+        if (!checkLocationPermission()) {
+            requestLocationPermission()
+            return
+        }
+
+        // Show confirmation dialog
+        showLocationConfirmDialog()
+    }
+
+    /**
+     * Show location confirmation dialog
+     */
+    fun showLocationConfirmDialog() {
+        _showLocationConfirmDialog.value = true
+    }
+
+    /**
+     * Hide location confirmation dialog
+     */
+    fun hideLocationConfirmDialog() {
+        _showLocationConfirmDialog.value = false
+    }
+
+    /**
+     * Capture customer location and save to repository
+     * Called after user confirms in dialog
+     */
+    fun captureCustomerLocation() {
+        val customer = _selectedCustomer.value ?: return
+
+        viewModelScope.launch {
+            // Emit loading state
+            _locationState.value = Resource.Loading()
+
+            // Hide dialog
+            hideLocationConfirmDialog()
+
+            // Check if location services are enabled
+            if (!locationService.isLocationEnabled()) {
+                _locationState.value = Resource.Error("GPS is disabled. Please enable location services in Settings.")
+                return@launch
+            }
+
+            // Get current location from LocationService
+            locationService.getCurrentLocation().collect { locationResource ->
+                when (locationResource) {
+                    is Resource.Loading -> {
+                        _locationState.value = Resource.Loading()
+                    }
+                    is Resource.Success -> {
+                        val location = locationResource.data
+                        if (location != null) {
+                            // Update customer location in repository
+                            customerRepository.updateCustomerLocation(
+                                customerId = customer.id,
+                                latitude = location.latitude,
+                                longitude = location.longitude
+                            ).collect { updateResource ->
+                                when (updateResource) {
+                                    is Resource.Loading -> {
+                                        _locationState.value = Resource.Loading()
+                                    }
+                                    is Resource.Success -> {
+                                        // Reload customer to show updated location
+                                        loadCustomerById(customer.id)
+                                        _locationState.value = Resource.Success(
+                                            Unit,
+                                            updateResource.message ?: "Location captured successfully"
+                                        )
+                                    }
+                                    is Resource.Error -> {
+                                        _locationState.value = Resource.Error(
+                                            updateResource.message ?: "Failed to save location"
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            _locationState.value = Resource.Error("Location data not available")
+                        }
+                    }
+                    is Resource.Error -> {
+                        _locationState.value = Resource.Error(
+                            locationResource.message ?: "Failed to get location"
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Clear location state (dismiss success/error messages)
+     */
+    fun clearLocationState() {
+        _locationState.value = null
     }
 }
