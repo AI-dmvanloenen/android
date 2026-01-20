@@ -13,17 +13,20 @@ import androidx.compose.ui.Alignment
 import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.odoo.fieldapp.R
 import com.odoo.fieldapp.domain.model.Customer
 import com.odoo.fieldapp.domain.model.Resource
-import java.text.SimpleDateFormat
-import java.util.*
+import com.odoo.fieldapp.presentation.components.AppSearchBar
+import com.odoo.fieldapp.presentation.components.EmptyStateView
+import com.odoo.fieldapp.presentation.components.ErrorBanner
+import com.odoo.fieldapp.presentation.components.SuccessBanner
 
 /**
  * Customer List Screen
- * 
+ *
  * Displays a searchable list of customers with sync functionality
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -40,6 +43,8 @@ fun CustomerListScreen(
     onClearSyncState: () -> Unit,
     onCreateClick: () -> Unit = {}
 ) {
+    val isRefreshing = syncState is Resource.Loading
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -54,14 +59,14 @@ fun CustomerListScreen(
                     // Sync button
                     IconButton(
                         onClick = onSyncClick,
-                        enabled = syncState !is Resource.Loading
+                        enabled = !isRefreshing
                     ) {
                         Icon(
-                            imageVector = if (syncState is Resource.Loading) Icons.Default.Sync else Icons.Default.Refresh,
+                            imageVector = if (isRefreshing) Icons.Default.Sync else Icons.Default.Refresh,
                             contentDescription = "Sync"
                         )
                     }
-                    
+
                     // Settings button
                     IconButton(onClick = onSettingsClick) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings")
@@ -81,15 +86,16 @@ fun CustomerListScreen(
                 .padding(paddingValues)
         ) {
             // Search bar
-            SearchBar(
+            AppSearchBar(
                 query = searchQuery,
                 onQueryChange = onSearchQueryChange,
                 onClearClick = onClearSearch,
+                placeholder = "Search customers...",
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
             )
-            
+
             // Auto-dismiss success messages after 3 seconds
             LaunchedEffect(syncState) {
                 if (syncState is Resource.Success) {
@@ -102,26 +108,26 @@ fun CustomerListScreen(
             syncState?.let { state ->
                 when (state) {
                     is Resource.Success -> {
-                        SuccessMessage(
-                            message = "Synced ${state.data?.size ?: 0} customers",
+                        SuccessBanner(
+                            message = if ((state.data?.size ?: 0) == 0) "There is nothing new to sync" else "Synced ${state.data?.size} customers",
                             onDismiss = onClearSyncState
                         )
                     }
                     is Resource.Error -> {
-                        ErrorMessage(
+                        ErrorBanner(
                             message = state.message ?: "Sync failed",
                             onDismiss = onClearSyncState
                         )
                     }
                     is Resource.Loading -> {
-                        // Loading indicator shown in toolbar
+                        // Loading indicator shown via pull-to-refresh
                     }
                 }
             }
-            
+
             // Customer list or empty state
             if (customers.isEmpty()) {
-                EmptyState(
+                CustomerEmptyState(
                     searchQuery = searchQuery,
                     onSyncClick = onSyncClick
                 )
@@ -133,35 +139,6 @@ fun CustomerListScreen(
             }
         }
     }
-}
-
-/**
- * Search bar component
- */
-@Composable
-fun SearchBar(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    onClearClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    OutlinedTextField(
-        value = query,
-        onValueChange = onQueryChange,
-        modifier = modifier,
-        placeholder = { Text("Search customers...") },
-        leadingIcon = {
-            Icon(Icons.Default.Search, contentDescription = "Search")
-        },
-        trailingIcon = {
-            if (query.isNotEmpty()) {
-                IconButton(onClick = onClearClick) {
-                    Icon(Icons.Default.Clear, contentDescription = "Clear")
-                }
-            }
-        },
-        singleLine = true
-    )
 }
 
 /**
@@ -187,7 +164,7 @@ fun CustomerList(
 }
 
 /**
- * Single customer list item
+ * Single customer list item with chevron
  */
 @Composable
 fun CustomerListItem(
@@ -198,62 +175,75 @@ fun CustomerListItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Customer name
-            Text(
-                text = customer.name,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            
-            Spacer(modifier = Modifier.height(4.dp))
-            
-            // City and phone
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+            Column(
+                modifier = Modifier.weight(1f)
             ) {
-                customer.city?.let { city ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.Place,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = city,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                // Customer name with improved typography
+                Text(
+                    text = customer.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // City and phone
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    customer.city?.let { city ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Place,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = city,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
-                }
-                
-                customer.phone?.let { phone ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.Phone,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = phone,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+
+                    customer.phone?.let { phone ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Phone,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = phone,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
+
+            // Chevron icon
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = "View details",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -262,143 +252,23 @@ fun CustomerListItem(
  * Empty state when no customers are found
  */
 @Composable
-fun EmptyState(
+fun CustomerEmptyState(
     searchQuery: String,
     onSyncClick: () -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            imageVector = if (searchQuery.isEmpty()) Icons.Default.Person else Icons.Default.Search,
-            contentDescription = if (searchQuery.isEmpty()) "No customers" else "No results",
-            modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
+    if (searchQuery.isNotEmpty()) {
+        EmptyStateView(
+            icon = Icons.Default.SearchOff,
+            title = "No customers found",
+            subtitle = "No results match \"$searchQuery\". Try a different search term."
         )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Text(
-            text = if (searchQuery.isEmpty()) {
-                "No customers yet"
-            } else {
-                "No customers found"
-            },
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+    } else {
+        EmptyStateView(
+            icon = Icons.Default.People,
+            title = "No customers yet",
+            subtitle = "Tap the button below to sync customers from Odoo",
+            actionLabel = "Sync Now",
+            onActionClick = onSyncClick
         )
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        Text(
-            text = if (searchQuery.isEmpty()) {
-                "Tap the sync button to load customers from Odoo"
-            } else {
-                "Try a different search term"
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        
-        if (searchQuery.isEmpty()) {
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = onSyncClick) {
-                Icon(Icons.Default.Refresh, contentDescription = "Sync")
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Sync Now")
-            }
-        }
-    }
-}
-
-/**
- * Success message banner
- */
-@Composable
-fun SuccessMessage(
-    message: String,
-    onDismiss: () -> Unit
-) {
-    Surface(
-        color = MaterialTheme.colorScheme.primaryContainer,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Default.CheckCircle,
-                    contentDescription = "Success",
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = message,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
-            IconButton(onClick = onDismiss) {
-                Icon(
-                    Icons.Default.Close,
-                    contentDescription = "Dismiss",
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
-        }
-    }
-}
-
-/**
- * Error message banner
- */
-@Composable
-fun ErrorMessage(
-    message: String,
-    onDismiss: () -> Unit
-) {
-    Surface(
-        color = MaterialTheme.colorScheme.errorContainer,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Default.Warning,
-                    contentDescription = "Error",
-                    tint = MaterialTheme.colorScheme.onErrorContainer
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = message,
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
-            }
-            IconButton(onClick = onDismiss) {
-                Icon(
-                    Icons.Default.Close,
-                    contentDescription = "Dismiss",
-                    tint = MaterialTheme.colorScheme.onErrorContainer
-                )
-            }
-        }
     }
 }

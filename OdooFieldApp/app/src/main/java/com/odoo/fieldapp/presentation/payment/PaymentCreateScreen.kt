@@ -47,14 +47,11 @@ fun PaymentCreateScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var showCustomerDropdown by remember { mutableStateOf(false) }
 
-    // Show snackbar for create results
+    // Handle create results
     LaunchedEffect(createState) {
         when (createState) {
             is Resource.Success -> {
-                snackbarHostState.showSnackbar(
-                    message = "Payment created successfully",
-                    duration = SnackbarDuration.Short
-                )
+                // Navigate back immediately on success
                 onClearCreateState()
                 onBackClick()
             }
@@ -77,22 +74,6 @@ fun PaymentCreateScreen(
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    // Save button
-                    TextButton(
-                        onClick = onSaveClick,
-                        enabled = createState !is Resource.Loading
-                    ) {
-                        if (createState is Resource.Loading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Text("Save")
-                        }
                     }
                 }
             )

@@ -109,4 +109,10 @@ interface SaleDao {
      */
     @Query("SELECT COUNT(*) FROM sales")
     fun getSaleCount(): Flow<Int>
+
+    /**
+     * Count sales with sync errors
+     */
+    @Query("SELECT COUNT(*) FROM sales WHERE syncState = 'ERROR'")
+    fun countSaleSyncErrors(): Flow<Int>
 }

@@ -123,6 +123,22 @@ class SalesController(http.Controller):
             return json_error("Internal server error", status=500, details=str(exp))
 
     def __sale_order_to_dict(self, order):
+        # Build order lines array
+        lines = []
+        for line in order.order_line:
+            lines.append({
+                'id': line.id,
+                'product_id': line.product_id.id if line.product_id else None,
+                'product_name': line.product_id.name if line.product_id else '',
+                'product_uom_qty': line.product_uom_qty,
+                'qty_delivered': line.qty_delivered,
+                'qty_invoiced': line.qty_invoiced,
+                'price_unit': line.price_unit,
+                'discount': line.discount,
+                'price_subtotal': line.price_subtotal,
+                'uom': line.product_uom.name if line.product_uom else '',
+            })
+
         return {
             'id': order.id,
             'mobile_uid': order.mobile_uid or '',
@@ -132,6 +148,7 @@ class SalesController(http.Controller):
             'state': order.state or '',
             'partner_id': order.partner_id.id if order.partner_id else None,
             'write_date': format_datetime(order.write_date) if order.write_date else None,
+            'lines': lines,
         }
 
     def __dict_to_sale_order_vals(self, data):

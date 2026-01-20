@@ -95,3 +95,14 @@ data class CustomerPaginatedResponse(
     @SerializedName("offset")
     val offset: Int
 )
+
+/**
+ * Response wrapper for customer creation endpoint
+ */
+data class CustomerCreateResponse(
+    @SerializedName("count")
+    val count: Int,
+
+    @SerializedName("data")
+    val data: List<CustomerResponse>
+)

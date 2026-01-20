@@ -10,18 +10,24 @@ import com.odoo.fieldapp.data.local.dao.CustomerDao
 import com.odoo.fieldapp.data.local.dao.DeliveryDao
 import com.odoo.fieldapp.data.local.dao.DeliveryLineDao
 import com.odoo.fieldapp.data.local.dao.PaymentDao
+import com.odoo.fieldapp.data.local.dao.ProductDao
 import com.odoo.fieldapp.data.local.dao.SaleDao
+import com.odoo.fieldapp.data.local.dao.SaleLineDao
 import com.odoo.fieldapp.data.remote.DynamicBaseUrlInterceptor
 import com.odoo.fieldapp.data.remote.api.OdooApiService
 import com.odoo.fieldapp.data.repository.ApiKeyProvider
 import com.odoo.fieldapp.data.repository.ApiKeyProviderImpl
 import com.odoo.fieldapp.data.repository.CustomerRepositoryImpl
+import com.odoo.fieldapp.data.repository.DashboardRepositoryImpl
 import com.odoo.fieldapp.data.repository.DeliveryRepositoryImpl
 import com.odoo.fieldapp.data.repository.PaymentRepositoryImpl
+import com.odoo.fieldapp.data.repository.ProductRepositoryImpl
 import com.odoo.fieldapp.data.repository.SaleRepositoryImpl
 import com.odoo.fieldapp.domain.repository.CustomerRepository
+import com.odoo.fieldapp.domain.repository.DashboardRepository
 import com.odoo.fieldapp.domain.repository.DeliveryRepository
 import com.odoo.fieldapp.domain.repository.PaymentRepository
+import com.odoo.fieldapp.domain.repository.ProductRepository
 import com.odoo.fieldapp.domain.repository.SaleRepository
 import dagger.Module
 import dagger.Provides
@@ -185,17 +191,27 @@ object AppModule {
     }
 
     /**
+     * Provide SaleLine DAO
+     */
+    @Provides
+    @Singleton
+    fun provideSaleLineDao(database: OdooDatabase): SaleLineDao {
+        return database.saleLineDao()
+    }
+
+    /**
      * Provide SaleRepository
      */
     @Provides
     @Singleton
     fun provideSaleRepository(
         saleDao: SaleDao,
+        saleLineDao: SaleLineDao,
         customerDao: CustomerDao,
         apiService: OdooApiService,
         apiKeyProvider: ApiKeyProvider
     ): SaleRepository {
-        return SaleRepositoryImpl(saleDao, customerDao, apiService, apiKeyProvider)
+        return SaleRepositoryImpl(saleDao, saleLineDao, customerDao, apiService, apiKeyProvider)
     }
 
     /**
@@ -265,5 +281,54 @@ object AppModule {
             apiService,
             apiKeyProvider
         )
+    }
+
+    /**
+     * Provide DashboardRepository
+     */
+    @Provides
+    @Singleton
+    fun provideDashboardRepository(
+        deliveryDao: DeliveryDao,
+        paymentDao: PaymentDao,
+        customerDao: CustomerDao,
+        saleDao: SaleDao,
+        customerRepository: CustomerRepository,
+        saleRepository: SaleRepository,
+        deliveryRepository: DeliveryRepository,
+        paymentRepository: PaymentRepository
+    ): DashboardRepository {
+        return DashboardRepositoryImpl(
+            deliveryDao,
+            paymentDao,
+            customerDao,
+            saleDao,
+            customerRepository,
+            saleRepository,
+            deliveryRepository,
+            paymentRepository
+        )
+    }
+
+    /**
+     * Provide Product DAO
+     */
+    @Provides
+    @Singleton
+    fun provideProductDao(database: OdooDatabase): ProductDao {
+        return database.productDao()
+    }
+
+    /**
+     * Provide ProductRepository
+     */
+    @Provides
+    @Singleton
+    fun provideProductRepository(
+        productDao: ProductDao,
+        apiService: OdooApiService,
+        apiKeyProvider: ApiKeyProvider
+    ): ProductRepository {
+        return ProductRepositoryImpl(productDao, apiService, apiKeyProvider)
     }
 }

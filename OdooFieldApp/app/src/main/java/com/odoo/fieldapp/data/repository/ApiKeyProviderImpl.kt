@@ -31,25 +31,36 @@ class ApiKeyProviderImpl @Inject constructor(
     companion object {
         private val API_KEY = stringPreferencesKey("api_key")
         private val SERVER_URL = stringPreferencesKey("server_url")
-        private const val DEFAULT_BASE_URL = "https://test.odoo.com/"
+
+        // Sync timestamp keys for incremental sync
+        private fun lastSyncKey(entityType: String) = stringPreferencesKey("last_sync_$entityType")
     }
 
     /**
      * Cached base URL for synchronous access (used by interceptor)
      * Volatile ensures visibility across threads
+     * Empty string when not configured - requests will fail until user sets URL
      */
     @Volatile
-    private var cachedBaseUrl: String = DEFAULT_BASE_URL
+    private var cachedBaseUrl: String = ""
     
     override suspend fun getApiKey(): String? {
         return context.dataStore.data
-            .map { preferences -> preferences[API_KEY] }
+            .map { preferences ->
+                preferences[API_KEY]
+                    ?.replace("\n", "")
+                    ?.replace("\r", "")
+                    ?.trim()
+            }
             .first()
     }
-    
+
     override suspend fun setApiKey(apiKey: String) {
         context.dataStore.edit { preferences ->
             preferences[API_KEY] = apiKey
+                .replace("\n", "")
+                .replace("\r", "")
+                .trim()
         }
     }
     
@@ -95,17 +106,18 @@ class ApiKeyProviderImpl @Inject constructor(
      * Initialize cache from stored settings
      * Call this during app startup
      */
-    suspend fun initializeCache() {
+    override suspend fun initializeCache() {
         val url = getServerUrl()
         cachedBaseUrl = buildBaseUrl(url)
     }
 
     /**
      * Build base URL from server URL string
+     * Returns empty string if URL not configured
      */
     private fun buildBaseUrl(url: String?): String {
         if (url.isNullOrBlank()) {
-            return DEFAULT_BASE_URL
+            return ""
         }
 
         // Add https:// if no protocol specified
@@ -117,5 +129,29 @@ class ApiKeyProviderImpl @Inject constructor(
 
         // Ensure trailing slash
         return if (fullUrl.endsWith("/")) fullUrl else "$fullUrl/"
+    }
+
+    /**
+     * Get last sync timestamp for a specific entity type
+     * Returns ISO 8601 formatted string or null if never synced
+     */
+    override suspend fun getLastSyncTime(entityType: String): String? {
+        return context.dataStore.data
+            .map { preferences -> preferences[lastSyncKey(entityType)] }
+            .first()
+    }
+
+    /**
+     * Set last sync timestamp for a specific entity type
+     * Pass null to clear the sync time
+     */
+    override suspend fun setLastSyncTime(entityType: String, timestamp: String?) {
+        context.dataStore.edit { preferences ->
+            if (timestamp == null) {
+                preferences.remove(lastSyncKey(entityType))
+            } else {
+                preferences[lastSyncKey(entityType)] = timestamp
+            }
+        }
     }
 }

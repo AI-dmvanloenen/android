@@ -8,12 +8,16 @@ import com.odoo.fieldapp.data.local.dao.CustomerDao
 import com.odoo.fieldapp.data.local.dao.DeliveryDao
 import com.odoo.fieldapp.data.local.dao.DeliveryLineDao
 import com.odoo.fieldapp.data.local.dao.PaymentDao
+import com.odoo.fieldapp.data.local.dao.ProductDao
 import com.odoo.fieldapp.data.local.dao.SaleDao
+import com.odoo.fieldapp.data.local.dao.SaleLineDao
 import com.odoo.fieldapp.data.local.entity.CustomerEntity
 import com.odoo.fieldapp.data.local.entity.DeliveryEntity
 import com.odoo.fieldapp.data.local.entity.DeliveryLineEntity
 import com.odoo.fieldapp.data.local.entity.PaymentEntity
+import com.odoo.fieldapp.data.local.entity.ProductEntity
 import com.odoo.fieldapp.data.local.entity.SaleEntity
+import com.odoo.fieldapp.data.local.entity.SaleLineEntity
 
 /**
  * Room Database for the Odoo Field App
@@ -25,6 +29,9 @@ import com.odoo.fieldapp.data.local.entity.SaleEntity
  * Version 5: Added mobileUid column to customers table
  * Version 6: Added Delivery and DeliveryLine entities
  * Version 7: Added Payment entity
+ * Version 8: Added mobileUid, state to sales; productId, quantityDone to delivery_lines
+ * Version 9: Added SaleLine entity
+ * Version 10: Added Product entity
  *
  * Future versions will add:
  * - SyncQueueEntity
@@ -33,20 +40,24 @@ import com.odoo.fieldapp.data.local.entity.SaleEntity
     entities = [
         CustomerEntity::class,
         SaleEntity::class,
+        SaleLineEntity::class,
         DeliveryEntity::class,
         DeliveryLineEntity::class,
         PaymentEntity::class,
+        ProductEntity::class,
     ],
-    version = 7,
+    version = 10,
     exportSchema = true
 )
 abstract class OdooDatabase : RoomDatabase() {
 
     abstract fun customerDao(): CustomerDao
     abstract fun saleDao(): SaleDao
+    abstract fun saleLineDao(): SaleLineDao
     abstract fun deliveryDao(): DeliveryDao
     abstract fun deliveryLineDao(): DeliveryLineDao
     abstract fun paymentDao(): PaymentDao
+    abstract fun productDao(): ProductDao
 
     companion object {
         const val DATABASE_NAME = "odoo_field_db"
@@ -138,6 +149,87 @@ abstract class OdooDatabase : RoomDatabase() {
         }
 
         /**
+         * Migration from version 7 to 8
+         * Adds mobileUid and state to sales table
+         * Adds productId and quantityDone to delivery_lines table
+         */
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Add mobileUid and state columns to sales table
+                db.execSQL("ALTER TABLE sales ADD COLUMN mobileUid TEXT")
+                db.execSQL("ALTER TABLE sales ADD COLUMN state TEXT NOT NULL DEFAULT 'draft'")
+
+                // Create unique index on mobileUid
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_sales_mobileUid ON sales (mobileUid)")
+
+                // Add productId and quantityDone columns to delivery_lines table
+                db.execSQL("ALTER TABLE delivery_lines ADD COLUMN productId INTEGER")
+                db.execSQL("ALTER TABLE delivery_lines ADD COLUMN quantityDone REAL NOT NULL DEFAULT 0.0")
+            }
+        }
+
+        /**
+         * Migration from version 8 to 9
+         * Adds SaleLine table for sale order lines
+         */
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Create sale_lines table with foreign key
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS sale_lines (
+                        id INTEGER NOT NULL PRIMARY KEY,
+                        saleId INTEGER NOT NULL,
+                        productId INTEGER,
+                        productName TEXT NOT NULL,
+                        productUomQty REAL NOT NULL,
+                        qtyDelivered REAL NOT NULL,
+                        qtyInvoiced REAL NOT NULL,
+                        priceUnit REAL NOT NULL,
+                        discount REAL NOT NULL,
+                        priceSubtotal REAL NOT NULL,
+                        uom TEXT NOT NULL,
+                        FOREIGN KEY (saleId) REFERENCES sales(id) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+
+                // Create indices for sale_lines table
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_sale_lines_saleId ON sale_lines (saleId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_sale_lines_productId ON sale_lines (productId)")
+            }
+        }
+
+        /**
+         * Migration from version 9 to 10
+         * Adds Product table
+         */
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Create products table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS products (
+                        id INTEGER NOT NULL PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        defaultCode TEXT,
+                        barcode TEXT,
+                        listPrice REAL NOT NULL,
+                        uomId INTEGER,
+                        uomName TEXT,
+                        categId INTEGER,
+                        categName TEXT,
+                        type TEXT NOT NULL,
+                        active INTEGER NOT NULL,
+                        lastModified INTEGER NOT NULL
+                    )
+                """.trimIndent())
+
+                // Create indices for products table
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_products_name ON products (name)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_products_defaultCode ON products (defaultCode)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_products_barcode ON products (barcode)")
+            }
+        }
+
+        /**
          * All database migrations
          * Add new migrations here as schema evolves
          */
@@ -145,6 +237,9 @@ abstract class OdooDatabase : RoomDatabase() {
             MIGRATION_4_5,
             MIGRATION_5_6,
             MIGRATION_6_7,
+            MIGRATION_7_8,
+            MIGRATION_8_9,
+            MIGRATION_9_10,
         )
     }
 }

@@ -25,8 +25,10 @@ private val dateFormatter = ThreadLocal.withInitial {
 fun DeliveryLineResponse.toDomain(): DeliveryLine {
     return DeliveryLine(
         id = id ?: 0,
+        productId = productId,
         productName = productName,
         quantity = quantity ?: 0.0,
+        quantityDone = quantityDone ?: 0.0,
         uom = uom ?: "Units"
     )
 }

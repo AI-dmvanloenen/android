@@ -28,8 +28,10 @@ data class DeliveryLineEntity(
     @PrimaryKey
     val id: Int,                      // Odoo record ID (prevents duplicates)
     val deliveryId: Int,              // Foreign key to DeliveryEntity
+    val productId: Int?,              // Odoo product ID for linking
     val productName: String,          // Product name
-    val quantity: Double,             // Quantity to deliver
+    val quantity: Double,             // Quantity to deliver (demand)
+    val quantityDone: Double,         // Quantity already delivered
     val uom: String                   // Unit of measure
 )
 
@@ -39,8 +41,10 @@ data class DeliveryLineEntity(
 fun DeliveryLineEntity.toDomain(): DeliveryLine {
     return DeliveryLine(
         id = id,
+        productId = productId,
         productName = productName,
         quantity = quantity,
+        quantityDone = quantityDone,
         uom = uom
     )
 }
@@ -52,8 +56,10 @@ fun DeliveryLine.toEntity(deliveryId: Int): DeliveryLineEntity {
     return DeliveryLineEntity(
         id = id,
         deliveryId = deliveryId,
+        productId = productId,
         productName = productName,
         quantity = quantity,
+        quantityDone = quantityDone,
         uom = uom
     )
 }

@@ -25,7 +25,9 @@
       "Bash(nslookup:*)",
       "Bash(host:*)",
       "Bash(dig:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(grep:*)",
+      "Bash(java -version:*)"
     ]
   }
 }

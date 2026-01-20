@@ -32,6 +32,7 @@ Debug APK output: `app/build/outputs/apk/debug/app-debug.apk`
 ## Architecture Overview
 
 This is an **offline-first Android app** for field workers to access Odoo customer data. It uses **Clean Architecture with MVVM**.
+The goal of the app is to present temporary information to field agents and allow them to take action. Odoo is and remains the single source of truth.
 
 ### Three-Layer Architecture
 

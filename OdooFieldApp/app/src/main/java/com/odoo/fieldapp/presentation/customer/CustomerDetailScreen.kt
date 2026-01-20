@@ -1,5 +1,7 @@
 package com.odoo.fieldapp.presentation.customer
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -11,11 +13,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.odoo.fieldapp.domain.model.Customer
 import com.odoo.fieldapp.domain.model.Delivery
 import com.odoo.fieldapp.domain.model.Sale
+import com.odoo.fieldapp.presentation.components.DetailRow
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -35,6 +39,8 @@ fun CustomerDetailScreen(
     onSaleClick: (Sale) -> Unit = {},
     onDeliveryClick: (Delivery) -> Unit = {}
 ) {
+    val context = LocalContext.current
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -84,7 +90,7 @@ fun CustomerDetailScreen(
                             style = MaterialTheme.typography.headlineMedium,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
-                        
+
                         customer.taxId?.let { taxId ->
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
@@ -95,8 +101,8 @@ fun CustomerDetailScreen(
                         }
                     }
                 }
-                
-                // Contact information
+
+                // Contact information with interactive elements
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(
                         modifier = Modifier
@@ -108,33 +114,54 @@ fun CustomerDetailScreen(
                             text = "Contact Information",
                             style = MaterialTheme.typography.titleMedium
                         )
-                        
+
                         Divider()
-                        
+
+                        // Phone - tap to call
                         customer.phone?.let { phone ->
                             DetailRow(
                                 icon = Icons.Default.Phone,
                                 label = "Phone",
-                                value = phone
+                                value = phone,
+                                onClick = {
+                                    val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
+                                    context.startActivity(intent)
+                                }
                             )
                         }
-                        
+
+                        // Email - tap to send email
                         customer.email?.let { email ->
                             DetailRow(
                                 icon = Icons.Default.Email,
                                 label = "Email",
-                                value = email
+                                value = email,
+                                onClick = {
+                                    val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:$email"))
+                                    context.startActivity(intent)
+                                }
                             )
                         }
-                        
+
+                        // Website - tap to open browser
                         customer.website?.let { website ->
                             DetailRow(
                                 icon = Icons.Default.Public,
                                 label = "Website",
-                                value = website
+                                value = website,
+                                onClick = {
+                                    val url = if (website.startsWith("http://") || website.startsWith("https://")) {
+                                        website
+                                    } else {
+                                        "https://$website"
+                                    }
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                    context.startActivity(intent)
+                                }
                             )
                         }
-                        
+
+                        // City - not interactive
                         customer.city?.let { city ->
                             DetailRow(
                                 icon = Icons.Default.Place,
@@ -142,44 +169,6 @@ fun CustomerDetailScreen(
                                 value = city
                             )
                         }
-                    }
-                }
-                
-                // Additional information
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Text(
-                            text = "Additional Information",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        
-                        Divider()
-                        
-                        customer.date?.let { date ->
-                            val dateFormatter = SimpleDateFormat("MMM dd, yyyy", Locale.US)
-                            DetailRow(
-                                icon = Icons.Default.DateRange,
-                                label = "Date",
-                                value = dateFormatter.format(date)
-                            )
-                        }
-                        
-                        DetailRow(
-                            icon = Icons.Default.Info,
-                            label = "Odoo ID",
-                            value = customer.id.toString()
-                        )
-                        
-                        DetailRow(
-                            icon = Icons.Default.Sync,
-                            label = "Sync Status",
-                            value = customer.syncState.name
-                        )
                     }
                 }
 
@@ -194,6 +183,44 @@ fun CustomerDetailScreen(
                     deliveries = deliveries,
                     onDeliveryClick = onDeliveryClick
                 )
+
+                // Additional information
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "Additional Information",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+
+                        Divider()
+
+                        customer.date?.let { date ->
+                            val dateFormatter = SimpleDateFormat("MMM dd, yyyy", Locale.US)
+                            DetailRow(
+                                icon = Icons.Default.DateRange,
+                                label = "Date",
+                                value = dateFormatter.format(date)
+                            )
+                        }
+
+                        DetailRow(
+                            icon = Icons.Default.Info,
+                            label = "Odoo ID",
+                            value = customer.id.toString()
+                        )
+
+                        DetailRow(
+                            icon = Icons.Default.Sync,
+                            label = "Sync Status",
+                            value = customer.syncState.name
+                        )
+                    }
+                }
             }
         }
     }
@@ -452,42 +479,6 @@ private fun DeliveryItem(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = "View details",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-/**
- * Reusable detail row component
- */
-@Composable
-fun DetailRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    value: String
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(20.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
-        
-        Spacer(modifier = Modifier.width(12.dp))
-        
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.bodyLarge
             )
         }
     }

@@ -121,4 +121,10 @@ interface CustomerDao {
      */
     @Query("DELETE FROM customers WHERE id = :customerId")
     suspend fun deleteCustomerById(customerId: Int)
+
+    /**
+     * Count customers with sync errors
+     */
+    @Query("SELECT COUNT(*) FROM customers WHERE syncState = 'ERROR'")
+    fun countCustomerSyncErrors(): Flow<Int>
 }

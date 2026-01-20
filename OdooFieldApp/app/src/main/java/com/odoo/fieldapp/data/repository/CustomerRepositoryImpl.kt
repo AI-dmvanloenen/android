@@ -12,9 +12,12 @@ import com.odoo.fieldapp.domain.model.Resource
 import com.odoo.fieldapp.domain.model.SyncState
 import com.odoo.fieldapp.domain.repository.CustomerRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.Locale
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -34,6 +37,10 @@ class CustomerRepositoryImpl @Inject constructor(
 
     companion object {
         private const val TAG = "CustomerRepository"
+        private const val SYNC_KEY = "customers"
+        private val dateTimeFormatter = ThreadLocal.withInitial {
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+        }
     }
     
     /**
@@ -71,64 +78,84 @@ class CustomerRepositoryImpl @Inject constructor(
      * 5. If error, emit Error with message
      */
     override suspend fun syncCustomersFromOdoo(): Flow<Resource<List<Customer>>> = flow {
-        try {
-            // 1. Emit loading state with current local data
-            val localCustomers = customerDao.getAllCustomersOnce()
-            emit(Resource.Loading(data = localCustomers.map { it.toDomain() }))
+        // 1. Emit loading state with current local data
+        val localCustomers = customerDao.getAllCustomersOnce()
+        emit(Resource.Loading(data = localCustomers.map { it.toDomain() }))
 
-            // 2. Get API key
-            val apiKey = apiKeyProvider.getApiKey()
-            if (apiKey.isNullOrBlank()) {
-                emit(Resource.Error("API key not configured. Please add your API key in settings."))
-                return@flow
-            }
+        // 2. Get API key
+        val apiKey = apiKeyProvider.getApiKey()
+        if (apiKey.isNullOrBlank()) {
+            emit(Resource.Error("API key not configured. Please add your API key in settings."))
+            return@flow
+        }
 
-            // 3. Fetch from Odoo API
-            val response = apiService.getCustomers(apiKey)
+        // 3. Get last sync time for incremental sync
+        // If database is empty but we have a lastSyncTime, force full sync
+        // This handles cases where DB was cleared but DataStore persisted
+        var lastSyncTime = apiKeyProvider.getLastSyncTime(SYNC_KEY)
+        if (localCustomers.isEmpty() && lastSyncTime != null) {
+            Log.w(TAG, "Database empty but lastSyncTime exists ($lastSyncTime). Forcing full sync.")
+            apiKeyProvider.setLastSyncTime(SYNC_KEY, null)
+            lastSyncTime = null
+        }
+        Log.d(TAG, "Last sync time: $lastSyncTime")
 
-            if (response.isSuccessful) {
-                val paginatedResponse = response.body()
-                val customerResponses = paginatedResponse?.data ?: emptyList()
+        // 4. Fetch from Odoo API with since filter
+        val response = apiService.getCustomers(apiKey, lastSyncTime)
 
-                // 4. Filter out records with null IDs (prevents primary key conflicts)
-                val validResponses = customerResponses.filter { it.odooId != null }
+        if (response.isSuccessful) {
+            val paginatedResponse = response.body()
+            val customerResponses = paginatedResponse?.data ?: emptyList()
 
-                // 5. Convert API responses to domain models
-                val customers = validResponses.map { it.toDomain() }
+            // 5. Filter out records with null IDs (prevents primary key conflicts)
+            val validResponses = customerResponses.filter { it.odooId != null }
 
-                // 6. Save to local database (atomic transaction)
-                val entities = customers.map { it.toEntity() }
+            // 6. Convert API responses to domain models
+            val customers = validResponses.map { it.toDomain() }
+
+            // 7. Save to local database
+            // For incremental sync, we upsert instead of full replace
+            val entities = customers.map { it.toEntity() }
+            if (lastSyncTime == null) {
+                // Full sync: replace all
                 customerDao.syncCustomers(entities)
-
-                // 7. Emit success
-                emit(Resource.Success(customers))
             } else {
-                // API error
-                val errorMessage = when (response.code()) {
-                    401 -> "Authentication failed. Please check your API key."
-                    403 -> "Access denied. Your API key doesn't have permission."
-                    404 -> "Endpoint not found. Please check the base URL."
-                    500 -> "Odoo server error. Please try again later."
-                    else -> "Failed to sync: ${response.message()}"
-                }
-                emit(Resource.Error(errorMessage))
+                // Incremental sync: upsert only
+                customerDao.insertCustomers(entities)
             }
 
-        } catch (e: Exception) {
-            // Log the full exception for debugging
-            Log.e(TAG, "Customer sync failed", e)
+            // 8. Update last sync time
+            val newSyncTime = dateTimeFormatter.get()!!.format(Date())
+            apiKeyProvider.setLastSyncTime(SYNC_KEY, newSyncTime)
+            Log.d(TAG, "Updated last sync time to: $newSyncTime")
 
-            // Network or other error
-            val errorMessage = when {
-                e.message?.contains("Unable to resolve host") == true ->
-                    "Network error. Please check your internet connection."
-                e.message?.contains("timeout") == true ->
-                    "Request timed out. Please try again."
-                else ->
-                    "Sync failed: ${e.message ?: "Unknown error"}"
+            // 9. Emit success
+            emit(Resource.Success(customers))
+        } else {
+            // API error
+            val errorMessage = when (response.code()) {
+                401 -> "Authentication failed. Please check your API key."
+                403 -> "Access denied. Your API key doesn't have permission."
+                404 -> "Endpoint not found. Please check the base URL."
+                500 -> "Odoo server error. Please try again later."
+                else -> "Failed to sync: ${response.message()}"
             }
             emit(Resource.Error(errorMessage))
         }
+    }.catch { e ->
+        // Log the full exception for debugging
+        Log.e(TAG, "Customer sync failed", e)
+
+        // Network or other error
+        val errorMessage = when {
+            e.message?.contains("Unable to resolve host") == true ->
+                "Network error. Please check your internet connection."
+            e.message?.contains("timeout") == true ->
+                "Request timed out. Please try again."
+            else ->
+                "Sync failed: ${e.message ?: "Unknown error"}"
+        }
+        emit(Resource.Error(errorMessage))
     }
     
     /**
@@ -142,85 +169,82 @@ class CustomerRepositoryImpl @Inject constructor(
      * 5. On failure: keep PENDING for retry, emit error
      */
     override suspend fun createCustomer(customer: Customer): Flow<Resource<Customer>> = flow {
-        try {
-            // 1. Emit loading
-            emit(Resource.Loading())
+        // 1. Emit loading
+        emit(Resource.Loading())
 
-            // 2. Generate UUID for mobileUid
-            val mobileUid = UUID.randomUUID().toString()
+        // 2. Generate UUID for mobileUid
+        val mobileUid = UUID.randomUUID().toString()
 
-            // 3. Generate temporary negative ID for local storage
-            val minId = customerDao.getMinCustomerId() ?: 0
-            val tempId = if (minId >= 0) -1 else minId - 1
+        // 3. Generate temporary negative ID for local storage
+        val minId = customerDao.getMinCustomerId() ?: 0
+        val tempId = if (minId >= 0) -1 else minId - 1
 
-            // 4. Create customer with PENDING state
-            val pendingCustomer = customer.copy(
-                id = tempId,
-                mobileUid = mobileUid,
-                syncState = SyncState.PENDING,
-                lastModified = Date()
-            )
+        // 4. Create customer with PENDING state
+        val pendingCustomer = customer.copy(
+            id = tempId,
+            mobileUid = mobileUid,
+            syncState = SyncState.PENDING,
+            lastModified = Date()
+        )
 
-            // 5. Save locally
-            customerDao.insertCustomer(pendingCustomer.toEntity())
-            Log.d(TAG, "Customer saved locally with tempId=$tempId, mobileUid=$mobileUid")
+        // 5. Save locally
+        customerDao.insertCustomer(pendingCustomer.toEntity())
+        Log.d(TAG, "Customer saved locally with tempId=$tempId, mobileUid=$mobileUid")
 
-            // 6. Get API key
-            val apiKey = apiKeyProvider.getApiKey()
-            if (apiKey.isNullOrBlank()) {
-                emit(Resource.Error("API key not configured. Customer saved locally.", data = pendingCustomer))
-                return@flow
-            }
-
-            // 7. Call API to create customer
-            val request = pendingCustomer.toRequest()
-            val response = apiService.createCustomers(apiKey, listOf(request))
-
-            if (response.isSuccessful) {
-                val createdCustomers = response.body()
-                val createdResponse = createdCustomers?.firstOrNull { it.mobileUid == mobileUid }
-
-                if (createdResponse != null && createdResponse.odooId != null) {
-                    // 8. Success: Update local record with Odoo ID
-                    val syncedCustomer = createdResponse.toDomain()
-
-                    // Delete the temp record and insert with real ID
-                    customerDao.deleteCustomerById(tempId)
-                    customerDao.insertCustomer(syncedCustomer.toEntity())
-
-                    Log.d(TAG, "Customer synced successfully, odooId=${syncedCustomer.id}")
-                    emit(Resource.Success(syncedCustomer))
-                } else {
-                    // API returned success but no matching customer
-                    Log.w(TAG, "API response didn't include created customer")
-                    emit(Resource.Error("Customer created but response incomplete", data = pendingCustomer))
-                }
-            } else {
-                // API error - customer remains in PENDING state
-                val errorMessage = when (response.code()) {
-                    401 -> "Authentication failed. Please check your API key."
-                    403 -> "Access denied. Your API key doesn't have permission."
-                    404 -> "Endpoint not found. Please check the base URL."
-                    500 -> "Odoo server error. Please try again later."
-                    else -> "Failed to sync: ${response.message()}"
-                }
-                Log.e(TAG, "Customer creation API failed: $errorMessage")
-                emit(Resource.Error(errorMessage, data = pendingCustomer))
-            }
-
-        } catch (e: Exception) {
-            Log.e(TAG, "Customer creation failed", e)
-
-            val errorMessage = when {
-                e.message?.contains("Unable to resolve host") == true ->
-                    "Network error. Customer saved locally."
-                e.message?.contains("timeout") == true ->
-                    "Request timed out. Customer saved locally."
-                else ->
-                    "Creation failed: ${e.message ?: "Unknown error"}"
-            }
-            emit(Resource.Error(errorMessage))
+        // 6. Get API key
+        val apiKey = apiKeyProvider.getApiKey()
+        if (apiKey.isNullOrBlank()) {
+            emit(Resource.Error("API key not configured. Customer saved locally.", data = pendingCustomer))
+            return@flow
         }
+
+        // 7. Call API to create customer
+        val request = pendingCustomer.toRequest()
+        val response = apiService.createCustomers(apiKey, listOf(request))
+
+        if (response.isSuccessful) {
+            val createResponse = response.body()
+            val createdCustomer = createResponse?.data?.firstOrNull { it.mobileUid == mobileUid }
+
+            if (createdCustomer != null && createdCustomer.odooId != null) {
+                // 8. Success: Update local record with Odoo ID
+                val syncedCustomer = createdCustomer.toDomain()
+
+                // Delete the temp record and insert with real ID
+                customerDao.deleteCustomerById(tempId)
+                customerDao.insertCustomer(syncedCustomer.toEntity())
+
+                Log.d(TAG, "Customer synced successfully, odooId=${syncedCustomer.id}")
+                emit(Resource.Success(syncedCustomer))
+            } else {
+                // API returned success but no matching customer
+                Log.w(TAG, "API response didn't include created customer")
+                emit(Resource.Error("Customer created but response incomplete", data = pendingCustomer))
+            }
+        } else {
+            // API error - customer remains in PENDING state
+            val errorMessage = when (response.code()) {
+                401 -> "Authentication failed. Please check your API key."
+                403 -> "Access denied. Your API key doesn't have permission."
+                404 -> "Endpoint not found. Please check the base URL."
+                500 -> "Odoo server error. Please try again later."
+                else -> "Failed to sync: ${response.message()}"
+            }
+            Log.e(TAG, "Customer creation API failed: $errorMessage")
+            emit(Resource.Error(errorMessage, data = pendingCustomer))
+        }
+    }.catch { e ->
+        Log.e(TAG, "Customer creation failed", e)
+
+        val errorMessage = when {
+            e.message?.contains("Unable to resolve host") == true ->
+                "Network error. Customer saved locally."
+            e.message?.contains("timeout") == true ->
+                "Request timed out. Customer saved locally."
+            else ->
+                "Creation failed: ${e.message ?: "Unknown error"}"
+        }
+        emit(Resource.Error(errorMessage))
     }
     
     /**
@@ -252,4 +276,22 @@ interface ApiKeyProvider {
      * This avoids blocking the network thread
      */
     fun getCachedBaseUrl(): String
+
+    /**
+     * Initialize cache from stored settings
+     * Call this during app startup to ensure cached values match persisted values
+     */
+    suspend fun initializeCache()
+
+    /**
+     * Get last sync timestamp for a specific entity type
+     * Returns ISO 8601 formatted string or null if never synced
+     */
+    suspend fun getLastSyncTime(entityType: String): String?
+
+    /**
+     * Set last sync timestamp for a specific entity type
+     * Pass null to clear the sync time
+     */
+    suspend fun setLastSyncTime(entityType: String, timestamp: String?)
 }

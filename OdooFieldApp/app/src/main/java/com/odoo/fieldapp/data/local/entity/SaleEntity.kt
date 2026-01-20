@@ -23,9 +23,11 @@ import java.util.Date
 data class SaleEntity(
     @PrimaryKey
     val id: Int,                  // Odoo record ID (prevents duplicates)
+    val mobileUid: String?,       // UUID for mobile app synchronization
     val name: String,             // Sale order reference (e.g., "SO001")
     val dateOrder: Long?,         // Stored as timestamp
     val amountTotal: Double?,     // Total amount
+    val state: String,            // Order state (draft, sent, sale, done, cancel)
     val partnerId: Int?,          // Customer ID (foreign key)
     val partnerName: String?,     // Customer name (denormalized for display)
     val syncState: String,        // Stored as String (SYNCED, PENDING, etc.)
@@ -34,15 +36,19 @@ data class SaleEntity(
 
 /**
  * Extension function to convert SaleEntity to domain Sale
+ * Note: Lines are loaded separately and default to empty list here
  */
 fun SaleEntity.toDomain(): Sale {
     return Sale(
         id = id,
+        mobileUid = mobileUid,
         name = name,
         dateOrder = dateOrder?.let { Date(it) },
         amountTotal = amountTotal,
+        state = state,
         partnerId = partnerId,
         partnerName = partnerName,
+        lines = emptyList(),  // Lines loaded separately for performance
         syncState = SyncState.valueOf(syncState),
         lastModified = Date(lastModified)
     )
@@ -54,9 +60,11 @@ fun SaleEntity.toDomain(): Sale {
 fun Sale.toEntity(): SaleEntity {
     return SaleEntity(
         id = id,
+        mobileUid = mobileUid,
         name = name,
         dateOrder = dateOrder?.time,
         amountTotal = amountTotal,
+        state = state,
         partnerId = partnerId,
         partnerName = partnerName,
         syncState = syncState.name,

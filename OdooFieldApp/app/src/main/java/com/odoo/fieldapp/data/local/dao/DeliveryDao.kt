@@ -115,4 +115,24 @@ interface DeliveryDao {
      */
     @Query("SELECT COUNT(*) FROM deliveries")
     fun getDeliveryCount(): Flow<Int>
+
+    /**
+     * Count pending deliveries (assigned, waiting, confirmed states)
+     * Used for dashboard statistics
+     */
+    @Query("SELECT COUNT(*) FROM deliveries WHERE state IN ('assigned', 'waiting', 'confirmed')")
+    fun countPendingDeliveries(): Flow<Int>
+
+    /**
+     * Count today's deliveries based on scheduled date
+     * Compares date portion of scheduledDate timestamp with today's date
+     */
+    @Query("SELECT COUNT(*) FROM deliveries WHERE date(scheduledDate / 1000, 'unixepoch', 'localtime') = date(:today)")
+    fun countTodaysDeliveries(today: String): Flow<Int>
+
+    /**
+     * Count deliveries with sync errors
+     */
+    @Query("SELECT COUNT(*) FROM deliveries WHERE syncState = 'ERROR'")
+    fun countDeliverySyncErrors(): Flow<Int>
 }

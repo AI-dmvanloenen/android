@@ -191,23 +191,6 @@ fun CustomerCreateScreen(
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                         enabled = !isLoading
                     )
-                }
-            }
-
-            // Contact information card
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Text(
-                        text = "Contact Information",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-
-                    Divider()
 
                     // Email field
                     OutlinedTextField(

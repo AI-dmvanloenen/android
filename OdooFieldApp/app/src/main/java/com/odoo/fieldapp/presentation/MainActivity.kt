@@ -3,21 +3,18 @@ package com.odoo.fieldapp.presentation
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Payment
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -28,6 +25,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.odoo.fieldapp.presentation.navigation.AppNavigation
 import com.odoo.fieldapp.presentation.navigation.Screen
+import com.odoo.fieldapp.ui.theme.OdooFieldAppTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 /**
@@ -38,6 +36,11 @@ sealed class BottomNavItem(
     val title: String,
     val icon: ImageVector
 ) {
+    object Dashboard : BottomNavItem(
+        route = Screen.Dashboard.route,
+        title = "Dashboard",
+        icon = Icons.Default.Home
+    )
     object Customers : BottomNavItem(
         route = Screen.CustomerList.route,
         title = "Customers",
@@ -88,14 +91,16 @@ fun MainScreen() {
 
     // Bottom navigation items
     val bottomNavItems = listOf(
+        BottomNavItem.Dashboard,
         BottomNavItem.Customers,
         BottomNavItem.Sales,
         BottomNavItem.Deliveries,
         BottomNavItem.Payments
     )
 
-    // Only show bottom nav on list screens (not detail or settings)
+    // Only show bottom nav on main screens (not detail or settings)
     val showBottomNav = currentDestination?.route in listOf(
+        Screen.Dashboard.route,
         Screen.CustomerList.route,
         Screen.SalesList.route,
         Screen.DeliveriesList.route,
@@ -136,22 +141,3 @@ fun MainScreen() {
     }
 }
 
-/**
- * App Theme
- */
-@Composable
-fun OdooFieldAppTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    content: @Composable () -> Unit
-) {
-    val colorScheme = if (darkTheme) {
-        darkColorScheme()
-    } else {
-        lightColorScheme()
-    }
-    
-    MaterialTheme(
-        colorScheme = colorScheme,
-        content = content
-    )
-}

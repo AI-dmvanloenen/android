@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Android API',
-    'version': '18.0.11.0.0',
+    'version': '18.0.12.0.0',
     'category': 'Technical',
     'summary': 'REST API endpoints for Android app integration',
     'description': """

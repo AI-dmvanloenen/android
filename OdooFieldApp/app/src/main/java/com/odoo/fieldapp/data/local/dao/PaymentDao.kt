@@ -107,4 +107,17 @@ interface PaymentDao {
      */
     @Query("DELETE FROM payments WHERE id > 0")
     suspend fun deleteAllSyncedPayments()
+
+    /**
+     * Count draft payments (pending payments)
+     * Used for dashboard statistics
+     */
+    @Query("SELECT COUNT(*) FROM payments WHERE state = 'draft'")
+    fun countDraftPayments(): Flow<Int>
+
+    /**
+     * Count payments with sync errors
+     */
+    @Query("SELECT COUNT(*) FROM payments WHERE syncState = 'ERROR'")
+    fun countPaymentSyncErrors(): Flow<Int>
 }

@@ -10,10 +10,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.odoo.fieldapp.domain.model.Payment
 import com.odoo.fieldapp.domain.model.Resource
+import com.odoo.fieldapp.presentation.components.EmptyStateView
+import com.odoo.fieldapp.presentation.components.PaymentStatusBadge
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -37,13 +40,14 @@ fun PaymentListScreen(
     onClearSyncState: () -> Unit
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+    val isRefreshing = syncState is Resource.Loading
 
     // Show snackbar for sync results
     LaunchedEffect(syncState) {
         when (syncState) {
             is Resource.Success -> {
                 snackbarHostState.showSnackbar(
-                    message = "Synced ${syncState.data?.size ?: 0} payments",
+                    message = if ((syncState.data?.size ?: 0) == 0) "There is nothing new to sync" else "Synced ${syncState.data?.size} payments",
                     duration = SnackbarDuration.Short
                 )
                 onClearSyncState()
@@ -68,9 +72,9 @@ fun PaymentListScreen(
                     // Sync button
                     IconButton(
                         onClick = onSyncClick,
-                        enabled = syncState !is Resource.Loading
+                        enabled = !isRefreshing
                     ) {
-                        if (syncState is Resource.Loading) {
+                        if (isRefreshing) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(24.dp),
                                 strokeWidth = 2.dp
@@ -114,36 +118,12 @@ fun PaymentListScreen(
                 singleLine = true
             )
 
-            // Payments list
+            // Payments list or empty state
             if (payments.isEmpty()) {
-                // Empty state
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Default.Payment,
-                            contentDescription = null,
-                            modifier = Modifier.size(64.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = if (searchQuery.isNotEmpty()) "No payments found" else "No payments yet",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        if (searchQuery.isEmpty()) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Tap sync to fetch payments from Odoo",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
+                PaymentEmptyState(
+                    searchQuery = searchQuery,
+                    onSyncClick = onSyncClick
+                )
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
@@ -163,7 +143,7 @@ fun PaymentListScreen(
 }
 
 /**
- * Single payment card in the list
+ * Single payment card in the list with chevron
  */
 @Composable
 private fun PaymentCard(
@@ -176,7 +156,8 @@ private fun PaymentCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable(onClick = onClick),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Row(
             modifier = Modifier
@@ -186,10 +167,11 @@ private fun PaymentCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                // Payment name/reference
+                // Payment name/reference with improved typography
                 Text(
                     text = payment.name.ifBlank { "Draft Payment" },
                     style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -230,49 +212,42 @@ private fun PaymentCard(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 // State badge
-                PaymentStateBadge(state = payment.state)
+                PaymentStatusBadge(state = payment.state)
             }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // Chevron icon
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = "View details",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
 
 /**
- * State badge for payment status
+ * Empty state for payments
  */
 @Composable
-fun PaymentStateBadge(state: String) {
-    val (containerColor, contentColor, label) = when (state) {
-        "posted" -> Triple(
-            MaterialTheme.colorScheme.primaryContainer,
-            MaterialTheme.colorScheme.onPrimaryContainer,
-            "Posted"
+fun PaymentEmptyState(
+    searchQuery: String,
+    onSyncClick: () -> Unit
+) {
+    if (searchQuery.isNotEmpty()) {
+        EmptyStateView(
+            icon = Icons.Default.SearchOff,
+            title = "No payments found",
+            subtitle = "No results match \"$searchQuery\". Try a different search term."
         )
-        "draft" -> Triple(
-            MaterialTheme.colorScheme.secondaryContainer,
-            MaterialTheme.colorScheme.onSecondaryContainer,
-            "Draft"
-        )
-        "cancelled" -> Triple(
-            MaterialTheme.colorScheme.errorContainer,
-            MaterialTheme.colorScheme.onErrorContainer,
-            "Cancelled"
-        )
-        else -> Triple(
-            MaterialTheme.colorScheme.surfaceVariant,
-            MaterialTheme.colorScheme.onSurfaceVariant,
-            state.replaceFirstChar { it.uppercase() }
-        )
-    }
-
-    Surface(
-        color = containerColor,
-        shape = MaterialTheme.shapes.small
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = contentColor,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+    } else {
+        EmptyStateView(
+            icon = Icons.Default.Payment,
+            title = "No payments yet",
+            subtitle = "Tap the button below to sync payments from Odoo",
+            actionLabel = "Sync Now",
+            onActionClick = onSyncClick
         )
     }
 }

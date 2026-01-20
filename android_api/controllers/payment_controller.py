@@ -41,7 +41,7 @@ class PaymentController(http.Controller):
             payments_env = request.env['account.payment'].sudo()
 
             # Base domain - only inbound customer payments
-            domain = [('payment_type', '=', 'inbound'), ('partner_type', '=', 'customer')]
+            domain = [('payment_type', '=', 'inbound')]
 
             # Apply filters
             if filters:

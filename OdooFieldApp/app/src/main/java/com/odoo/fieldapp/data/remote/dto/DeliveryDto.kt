@@ -9,11 +9,17 @@ data class DeliveryLineResponse(
     @SerializedName("id")
     val id: Int?,
 
+    @SerializedName("product_id")
+    val productId: Int?,
+
     @SerializedName("product_name")
     val productName: String,
 
     @SerializedName("quantity")
     val quantity: Double?,
+
+    @SerializedName("quantity_done")
+    val quantityDone: Double?,
 
     @SerializedName("uom")
     val uom: String?

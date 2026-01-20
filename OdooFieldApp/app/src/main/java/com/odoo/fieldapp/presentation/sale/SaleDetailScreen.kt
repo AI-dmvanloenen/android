@@ -1,16 +1,20 @@
 package com.odoo.fieldapp.presentation.sale
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.odoo.fieldapp.domain.model.Sale
+import com.odoo.fieldapp.domain.model.SaleLine
+import com.odoo.fieldapp.presentation.components.DetailRow
+import com.odoo.fieldapp.presentation.components.SaleStatusBadge
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -51,22 +55,42 @@ fun SaleDetailScreen(
             }
         } else {
             // Sale details
-            Column(
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .verticalScroll(rememberScrollState())
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // Sale header card
-                SaleHeaderCard(sale)
+                item {
+                    SaleHeaderCard(sale)
+                }
 
                 // Order information
-                SaleInfoCard(sale)
+                item {
+                    SaleInfoCard(sale)
+                }
+
+                // Order lines (Items) - styled like DeliveryDetailScreen
+                if (sale.lines.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "Items (${sale.lines.size})",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
+
+                    items(sale.lines, key = { it.id }) { line ->
+                        SaleLineCard(line)
+                    }
+                }
 
                 // System information
-                SystemInfoCard(sale)
+                item {
+                    SystemInfoCard(sale)
+                }
             }
         }
     }
@@ -85,11 +109,19 @@ private fun SaleHeaderCard(sale: Sale) {
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            Text(
-                text = sale.name,
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = sale.name,
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+
+                SaleStatusBadge(state = sale.state)
+            }
 
             // Show customer name below SO name
             sale.partnerName?.let { customerName ->
@@ -124,7 +156,7 @@ private fun SaleInfoCard(sale: Sale) {
             Divider()
 
             sale.dateOrder?.let { date ->
-                SaleDetailRow(
+                DetailRow(
                     icon = Icons.Default.DateRange,
                     label = "Order Date",
                     value = dateFormatter.format(date)
@@ -132,13 +164,133 @@ private fun SaleInfoCard(sale: Sale) {
             }
 
             sale.amountTotal?.let { amount ->
-                SaleDetailRow(
+                DetailRow(
                     icon = Icons.Default.AttachMoney,
                     label = "Total Amount",
                     value = currencyFormatter.format(amount)
                 )
             }
+
+            DetailRow(
+                icon = Icons.Default.Flag,
+                label = "Status",
+                value = when (sale.state) {
+                    "draft" -> "Quotation"
+                    "sent" -> "Quotation Sent"
+                    "sale" -> "Sales Order"
+                    "done" -> "Locked"
+                    "cancel" -> "Cancelled"
+                    else -> sale.state.replaceFirstChar { it.uppercase() }
+                }
+            )
         }
+    }
+}
+
+@Composable
+private fun SaleLineCard(line: SaleLine) {
+    val currencyFormatter = NumberFormat.getCurrencyInstance(Locale.US)
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = line.productName,
+                        style = MaterialTheme.typography.bodyLarge,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    line.productId?.let { productId ->
+                        Text(
+                            text = "Product ID: $productId",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Column(horizontalAlignment = Alignment.End) {
+                    // Show quantity
+                    Text(
+                        text = "${line.productUomQty.formatQty()}",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = line.uom,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // Price info
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Unit price with discount
+                Text(
+                    text = buildString {
+                        append(currencyFormatter.format(line.priceUnit))
+                        if (line.discount > 0) {
+                            append(" (-${line.discount.formatQty()}%)")
+                        }
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                // Subtotal
+                Text(
+                    text = currencyFormatter.format(line.priceSubtotal),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            // Delivery/Invoice status if applicable
+            if (line.qtyDelivered > 0 || line.qtyInvoiced > 0) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = buildString {
+                        append("${line.qtyDelivered.formatQty()} delivered")
+                        if (line.qtyInvoiced > 0) {
+                            append(", ${line.qtyInvoiced.formatQty()} invoiced")
+                        }
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Format quantity, removing unnecessary decimals
+ */
+private fun Double.formatQty(): String {
+    return if (this == this.toLong().toDouble()) {
+        this.toLong().toString()
+    } else {
+        String.format(Locale.US, "%.2f", this)
     }
 }
 
@@ -160,58 +312,22 @@ private fun SystemInfoCard(sale: Sale) {
 
             Divider()
 
-            SaleDetailRow(
+            DetailRow(
                 icon = Icons.Default.Info,
                 label = "Odoo ID",
                 value = sale.id.toString()
             )
 
-            SaleDetailRow(
+            DetailRow(
                 icon = Icons.Default.Sync,
                 label = "Sync Status",
                 value = sale.syncState.name
             )
 
-            SaleDetailRow(
+            DetailRow(
                 icon = Icons.Default.Update,
                 label = "Last Modified",
                 value = dateFormatter.format(sale.lastModified)
-            )
-        }
-    }
-}
-
-/**
- * Reusable detail row component
- */
-@Composable
-fun SaleDetailRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    value: String
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(20.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.bodyLarge
             )
         }
     }

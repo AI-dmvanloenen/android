@@ -14,6 +14,8 @@ import androidx.compose.ui.unit.dp
 import com.odoo.fieldapp.domain.model.Delivery
 import com.odoo.fieldapp.domain.model.DeliveryLine
 import com.odoo.fieldapp.domain.model.Resource
+import com.odoo.fieldapp.presentation.components.DeliveryStatusBadge
+import com.odoo.fieldapp.presentation.components.DetailRow
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -34,7 +36,7 @@ fun DeliveryDetailScreen(
     onSaleClick: ((Int) -> Unit)? = null
 ) {
     // Show snackbar for validation results
-    val snackbarHostState = androidx.compose.material3.SnackbarHostState()
+    val snackbarHostState = SnackbarHostState()
 
     LaunchedEffect(validateState) {
         when (validateState) {
@@ -192,7 +194,7 @@ private fun DeliveryHeaderCard(delivery: Delivery) {
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
 
-                DeliveryStateBadge(state = delivery.state)
+                DeliveryStatusBadge(state = delivery.state)
             }
 
             // Show customer name below delivery name
@@ -227,18 +229,18 @@ private fun ScheduleInfoCard(delivery: Delivery) {
             Divider()
 
             delivery.scheduledDate?.let { date ->
-                DeliveryDetailRow(
+                DetailRow(
                     icon = Icons.Default.Schedule,
                     label = "Scheduled Date",
                     value = dateFormatter.format(date)
                 )
-            } ?: DeliveryDetailRow(
+            } ?: DetailRow(
                 icon = Icons.Default.Schedule,
                 label = "Scheduled Date",
                 value = "Not scheduled"
             )
 
-            DeliveryDetailRow(
+            DetailRow(
                 icon = Icons.Default.Flag,
                 label = "Status",
                 value = delivery.state.replaceFirstChar { it.uppercase() }
@@ -249,43 +251,70 @@ private fun ScheduleInfoCard(delivery: Delivery) {
 
 @Composable
 private fun DeliveryLineCard(line: DeliveryLine) {
+    val progress = if (line.quantity > 0) (line.quantityDone / line.quantity).coerceIn(0.0, 1.0) else 0.0
+    val isComplete = line.quantityDone >= line.quantity
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
         )
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(16.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = line.productName,
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                Text(
-                    text = "ID: ${line.id}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = line.productName,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    line.productId?.let { productId ->
+                        Text(
+                            text = "Product ID: $productId",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Column(horizontalAlignment = Alignment.End) {
+                    // Show done/demand
+                    Text(
+                        text = "${line.quantityDone.toInt()} / ${line.quantity.toInt()}",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = if (isComplete) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = line.uom,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = "${line.quantity}",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = line.uom,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            // Progress bar
+            Spacer(modifier = Modifier.height(8.dp))
+            LinearProgressIndicator(
+                progress = progress.toFloat(),
+                modifier = Modifier.fillMaxWidth(),
+                color = if (isComplete) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+
+            // Status text
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = if (isComplete) "Complete" else "${(progress * 100).toInt()}% delivered",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (isComplete) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -310,18 +339,10 @@ private fun SaleInfoCard(
             Divider()
 
             delivery.saleName?.let { name ->
-                DeliveryDetailRow(
+                DetailRow(
                     icon = Icons.Default.ShoppingCart,
                     label = "Sale Order",
                     value = name
-                )
-            }
-
-            delivery.saleId?.let { id ->
-                DeliveryDetailRow(
-                    icon = Icons.Default.Badge,
-                    label = "Sale ID",
-                    value = id.toString()
                 )
             }
 
@@ -344,46 +365,14 @@ private fun CustomerInfoCard(
     delivery: Delivery,
     onCustomerClick: ((Int) -> Unit)?
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+    if (delivery.partnerId != null && onCustomerClick != null) {
+        OutlinedButton(
+            onClick = { onCustomerClick(delivery.partnerId) },
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Text(
-                text = "Customer",
-                style = MaterialTheme.typography.titleMedium
-            )
-
-            Divider()
-
-            delivery.partnerName?.let { name ->
-                DeliveryDetailRow(
-                    icon = Icons.Default.Person,
-                    label = "Customer Name",
-                    value = name
-                )
-            }
-
-            delivery.partnerId?.let { id ->
-                DeliveryDetailRow(
-                    icon = Icons.Default.Badge,
-                    label = "Customer ID",
-                    value = id.toString()
-                )
-            }
-
-            if (delivery.partnerId != null && onCustomerClick != null) {
-                OutlinedButton(
-                    onClick = { onCustomerClick(delivery.partnerId) },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Default.OpenInNew, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("View Customer")
-                }
-            }
+            Icon(Icons.Default.OpenInNew, contentDescription = null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("View Customer")
         }
     }
 }
@@ -406,58 +395,22 @@ private fun SystemInfoCard(delivery: Delivery) {
 
             Divider()
 
-            DeliveryDetailRow(
+            DetailRow(
                 icon = Icons.Default.Info,
                 label = "Odoo ID",
                 value = delivery.id.toString()
             )
 
-            DeliveryDetailRow(
+            DetailRow(
                 icon = Icons.Default.Sync,
                 label = "Sync Status",
                 value = delivery.syncState.name
             )
 
-            DeliveryDetailRow(
+            DetailRow(
                 icon = Icons.Default.Update,
                 label = "Last Modified",
                 value = dateFormatter.format(delivery.lastModified)
-            )
-        }
-    }
-}
-
-/**
- * Reusable detail row component
- */
-@Composable
-fun DeliveryDetailRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    value: String
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(20.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.bodyLarge
             )
         }
     }

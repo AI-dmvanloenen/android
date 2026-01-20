@@ -11,6 +11,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.odoo.fieldapp.domain.model.Payment
+import com.odoo.fieldapp.presentation.components.DetailRow
+import com.odoo.fieldapp.presentation.components.PaymentStatusBadge
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -107,7 +109,7 @@ private fun PaymentHeaderCard(payment: Payment) {
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
 
-                PaymentStateBadge(state = payment.state)
+                PaymentStatusBadge(state = payment.state)
             }
         }
     }
@@ -164,18 +166,10 @@ private fun CustomerCard(
             Divider()
 
             payment.partnerName?.let { name ->
-                PaymentDetailRow(
+                DetailRow(
                     icon = Icons.Default.Person,
                     label = "Customer Name",
                     value = name
-                )
-            }
-
-            payment.partnerId?.let { id ->
-                PaymentDetailRow(
-                    icon = Icons.Default.Badge,
-                    label = "Customer ID",
-                    value = id.toString()
                 )
             }
 
@@ -212,21 +206,21 @@ private fun PaymentDetailsCard(payment: Payment) {
             Divider()
 
             payment.date?.let { date ->
-                PaymentDetailRow(
+                DetailRow(
                     icon = Icons.Default.DateRange,
                     label = "Payment Date",
                     value = dateFormatter.format(date)
                 )
             }
 
-            PaymentDetailRow(
+            DetailRow(
                 icon = Icons.Default.Flag,
                 label = "Status",
                 value = payment.state.replaceFirstChar { it.uppercase() }
             )
 
             payment.memo?.let { memo ->
-                PaymentDetailRow(
+                DetailRow(
                     icon = Icons.Default.Description,
                     label = "Memo",
                     value = memo
@@ -234,7 +228,7 @@ private fun PaymentDetailsCard(payment: Payment) {
             }
 
             payment.journalId?.let { journalId ->
-                PaymentDetailRow(
+                DetailRow(
                     icon = Icons.Default.AccountBalance,
                     label = "Journal ID",
                     value = journalId.toString()
@@ -262,66 +256,30 @@ private fun SystemInfoCard(payment: Payment) {
 
             Divider()
 
-            PaymentDetailRow(
+            DetailRow(
                 icon = Icons.Default.Info,
                 label = "Odoo ID",
                 value = payment.id.toString()
             )
 
             payment.mobileUid?.let { uid ->
-                PaymentDetailRow(
+                DetailRow(
                     icon = Icons.Default.Fingerprint,
                     label = "Mobile UID",
                     value = uid
                 )
             }
 
-            PaymentDetailRow(
+            DetailRow(
                 icon = Icons.Default.Sync,
                 label = "Sync Status",
                 value = payment.syncState.name
             )
 
-            PaymentDetailRow(
+            DetailRow(
                 icon = Icons.Default.Update,
                 label = "Last Modified",
                 value = dateFormatter.format(payment.lastModified)
-            )
-        }
-    }
-}
-
-/**
- * Reusable detail row component
- */
-@Composable
-fun PaymentDetailRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    value: String
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(20.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.bodyLarge
             )
         }
     }
