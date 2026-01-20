@@ -108,6 +108,9 @@ class SalesController(http.Controller):
                     order = orders_env.search([('mobile_uid', '=', mobile_uid)], limit=1)
                     if order:
                         order_vals.pop('mobile_uid', None)
+                        # Clear existing lines before adding new ones
+                        if 'order_line' in order_vals:
+                            order.order_line.unlink()
                         order.write(order_vals)
                         _logger.info(f'Sale order {order.id} updated')
                     else:
@@ -163,5 +166,19 @@ class SalesController(http.Controller):
             dt, _ = parse_datetime(date_str)
             if dt:
                 vals['date_order'] = dt
+
+        # Handle order lines
+        lines_data = data.get('lines', [])
+        if lines_data:
+            order_lines = []
+            for line in lines_data:
+                line_vals = {
+                    'product_id': line.get('product_id'),
+                    'product_uom_qty': line.get('product_uom_qty', 1.0),
+                }
+                if line.get('price_unit') is not None:
+                    line_vals['price_unit'] = line.get('price_unit')
+                order_lines.append((0, 0, line_vals))
+            vals['order_line'] = order_lines
 
         return {k: v for k, v in vals.items() if v is not None}

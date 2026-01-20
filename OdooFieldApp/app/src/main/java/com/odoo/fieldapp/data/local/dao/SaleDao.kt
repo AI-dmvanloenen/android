@@ -115,4 +115,16 @@ interface SaleDao {
      */
     @Query("SELECT COUNT(*) FROM sales WHERE syncState = 'ERROR'")
     fun countSaleSyncErrors(): Flow<Int>
+
+    /**
+     * Get minimum sale ID (for generating temporary negative IDs)
+     */
+    @Query("SELECT MIN(id) FROM sales")
+    suspend fun getMinSaleId(): Int?
+
+    /**
+     * Delete a sale by ID
+     */
+    @Query("DELETE FROM sales WHERE id = :saleId")
+    suspend fun deleteSaleById(saleId: Int)
 }

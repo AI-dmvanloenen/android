@@ -32,6 +32,7 @@ import com.odoo.fieldapp.presentation.payment.PaymentCreateScreen
 import com.odoo.fieldapp.presentation.payment.PaymentDetailScreen
 import com.odoo.fieldapp.presentation.payment.PaymentListScreen
 import com.odoo.fieldapp.presentation.payment.PaymentViewModel
+import com.odoo.fieldapp.presentation.sale.SaleCreateScreen
 import com.odoo.fieldapp.presentation.sale.SaleDetailScreen
 import com.odoo.fieldapp.presentation.sale.SaleListScreen
 import com.odoo.fieldapp.presentation.sale.SaleViewModel
@@ -49,6 +50,7 @@ sealed class Screen(val route: String) {
         fun createRoute(customerId: Int) = "customer_detail/$customerId"
     }
     object SalesList : Screen("sales_list")
+    object SaleCreate : Screen("sale_create")
     object SaleDetail : Screen("sale_detail/{saleId}") {
         fun createRoute(saleId: Int) = "sale_detail/$saleId"
     }
@@ -193,10 +195,14 @@ fun AppNavigation(
                 val viewModel: DashboardViewModel = hiltViewModel()
                 val stats by viewModel.stats.collectAsState()
                 val syncState by viewModel.syncState.collectAsState()
+                val pendingSyncCount by viewModel.pendingSyncCount.collectAsState()
+                val lastSyncTime by viewModel.lastSyncTime.collectAsState()
 
                 DashboardScreen(
                     stats = stats,
                     syncState = syncState,
+                    pendingSyncCount = pendingSyncCount,
+                    lastSyncTime = lastSyncTime,
                     onDeliveriesClick = {
                         navController.navigate(Screen.DeliveriesList.route) {
                             popUpTo(navController.graph.findStartDestination().id) {
@@ -230,6 +236,9 @@ fun AppNavigation(
                     },
                     onCreateCustomerClick = {
                         navController.navigate(Screen.CustomerCreate.route)
+                    },
+                    onCreateSaleClick = {
+                        navController.navigate(Screen.SaleCreate.route)
                     },
                     onSyncAllClick = viewModel::syncAll,
                     onSettingsClick = {
@@ -381,7 +390,60 @@ fun AppNavigation(
                             Screen.SaleDetail.createRoute(sale.id)
                         )
                     },
+                    onCreateClick = {
+                        navController.navigate(Screen.SaleCreate.route)
+                    },
                     onClearSyncState = viewModel::clearSyncState
+                )
+            }
+
+            // Sale Create Screen
+            composable(Screen.SaleCreate.route) {
+                val saleViewModel: SaleViewModel = hiltViewModel()
+                val customerViewModel: CustomerViewModel = hiltViewModel()
+
+                val customers by customerViewModel.customers.collectAsState()
+                val selectedPartnerId by saleViewModel.createPartnerId.collectAsState()
+                val selectedPartnerName by saleViewModel.createPartnerName.collectAsState()
+                val partnerError by saleViewModel.partnerError.collectAsState()
+                val linesError by saleViewModel.linesError.collectAsState()
+                val createState by saleViewModel.createState.collectAsState()
+
+                // Order lines state
+                val lineItems by saleViewModel.createLineItems.collectAsState()
+                val orderTotal by saleViewModel.orderTotal.collectAsState()
+
+                // Product picker state
+                val products by saleViewModel.products.collectAsState()
+                val showProductPicker by saleViewModel.showProductPicker.collectAsState()
+                val productSearchQuery by saleViewModel.productSearchQuery.collectAsState()
+
+                SaleCreateScreen(
+                    customers = customers,
+                    selectedPartnerId = selectedPartnerId,
+                    selectedPartnerName = selectedPartnerName,
+                    lineItems = lineItems,
+                    orderTotal = orderTotal,
+                    products = products,
+                    showProductPicker = showProductPicker,
+                    productSearchQuery = productSearchQuery,
+                    partnerError = partnerError,
+                    linesError = linesError,
+                    createState = createState,
+                    onPartnerChange = saleViewModel::onCreatePartnerChange,
+                    onShowProductPicker = saleViewModel::showProductPicker,
+                    onHideProductPicker = saleViewModel::hideProductPicker,
+                    onProductSearchQueryChange = saleViewModel::onProductSearchQueryChange,
+                    onAddLineItem = saleViewModel::addLineItem,
+                    onRemoveLineItem = saleViewModel::removeLineItem,
+                    onIncrementQuantity = saleViewModel::incrementLineQuantity,
+                    onDecrementQuantity = saleViewModel::decrementLineQuantity,
+                    onSaveClick = saleViewModel::createSale,
+                    onBackClick = {
+                        saleViewModel.clearCreateForm()
+                        navController.popBackStack()
+                    },
+                    onClearCreateState = saleViewModel::clearCreateState
                 )
             }
 

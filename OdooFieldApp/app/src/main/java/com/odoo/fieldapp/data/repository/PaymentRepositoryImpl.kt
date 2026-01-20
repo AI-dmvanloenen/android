@@ -96,7 +96,8 @@ class PaymentRepositoryImpl @Inject constructor(
         // 2. Get API key
         val apiKey = apiKeyProvider.getApiKey()
         if (apiKey.isNullOrBlank()) {
-            emit(Resource.Error("API key not configured. Please add your API key in settings."))
+            val cachedData = localPayments.map { it.toDomain() }
+            emit(Resource.Error("API key not configured. Please add your API key in settings.", data = cachedData))
             return@flow
         }
 
@@ -151,7 +152,8 @@ class PaymentRepositoryImpl @Inject constructor(
             // 10. Emit success
             emit(Resource.Success(enrichedPayments))
         } else {
-            // API error
+            // API error - return cached data
+            val cachedData = localPayments.map { it.toDomain() }
             val errorMessage = when (response.code()) {
                 401 -> "Authentication failed. Please check your API key."
                 403 -> "Access denied. Your API key doesn't have permission."
@@ -159,13 +161,14 @@ class PaymentRepositoryImpl @Inject constructor(
                 500 -> "Odoo server error. Please try again later."
                 else -> "Failed to sync payments: ${response.message()}"
             }
-            emit(Resource.Error(errorMessage))
+            emit(Resource.Error(errorMessage, data = cachedData))
         }
     }.catch { e ->
         // Log the full exception for debugging
         Log.e(TAG, "Payment sync failed", e)
 
-        // Network or other error
+        // Network or other error - return cached data
+        val cachedData = paymentDao.getAllPaymentsOnce().map { it.toDomain() }
         val errorMessage = when {
             e.message?.contains("Unable to resolve host") == true ->
                 "Network error. Please check your internet connection."
@@ -174,7 +177,7 @@ class PaymentRepositoryImpl @Inject constructor(
             else ->
                 "Sync failed: ${e.message ?: "Unknown error"}"
         }
-        emit(Resource.Error(errorMessage))
+        emit(Resource.Error(errorMessage, data = cachedData))
     }
 
     /**

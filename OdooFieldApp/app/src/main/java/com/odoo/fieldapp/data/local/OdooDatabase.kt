@@ -11,6 +11,7 @@ import com.odoo.fieldapp.data.local.dao.PaymentDao
 import com.odoo.fieldapp.data.local.dao.ProductDao
 import com.odoo.fieldapp.data.local.dao.SaleDao
 import com.odoo.fieldapp.data.local.dao.SaleLineDao
+import com.odoo.fieldapp.data.local.dao.SyncQueueDao
 import com.odoo.fieldapp.data.local.entity.CustomerEntity
 import com.odoo.fieldapp.data.local.entity.DeliveryEntity
 import com.odoo.fieldapp.data.local.entity.DeliveryLineEntity
@@ -18,6 +19,7 @@ import com.odoo.fieldapp.data.local.entity.PaymentEntity
 import com.odoo.fieldapp.data.local.entity.ProductEntity
 import com.odoo.fieldapp.data.local.entity.SaleEntity
 import com.odoo.fieldapp.data.local.entity.SaleLineEntity
+import com.odoo.fieldapp.data.local.entity.SyncQueueEntity
 
 /**
  * Room Database for the Odoo Field App
@@ -32,9 +34,7 @@ import com.odoo.fieldapp.data.local.entity.SaleLineEntity
  * Version 8: Added mobileUid, state to sales; productId, quantityDone to delivery_lines
  * Version 9: Added SaleLine entity
  * Version 10: Added Product entity
- *
- * Future versions will add:
- * - SyncQueueEntity
+ * Version 11: Added SyncQueue entity for offline operations queue
  */
 @Database(
     entities = [
@@ -45,8 +45,9 @@ import com.odoo.fieldapp.data.local.entity.SaleLineEntity
         DeliveryLineEntity::class,
         PaymentEntity::class,
         ProductEntity::class,
+        SyncQueueEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = true
 )
 abstract class OdooDatabase : RoomDatabase() {
@@ -58,6 +59,7 @@ abstract class OdooDatabase : RoomDatabase() {
     abstract fun deliveryLineDao(): DeliveryLineDao
     abstract fun paymentDao(): PaymentDao
     abstract fun productDao(): ProductDao
+    abstract fun syncQueueDao(): SyncQueueDao
 
     companion object {
         const val DATABASE_NAME = "odoo_field_db"
@@ -230,6 +232,37 @@ abstract class OdooDatabase : RoomDatabase() {
         }
 
         /**
+         * Migration from version 10 to 11
+         * Adds SyncQueue table for offline operations queue
+         */
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Create sync_queue table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS sync_queue (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        entityType TEXT NOT NULL,
+                        operation TEXT NOT NULL,
+                        payload TEXT NOT NULL,
+                        mobileUid TEXT NOT NULL,
+                        status TEXT NOT NULL DEFAULT 'pending',
+                        retryCount INTEGER NOT NULL DEFAULT 0,
+                        maxRetries INTEGER NOT NULL DEFAULT 5,
+                        lastError TEXT,
+                        createdAt INTEGER NOT NULL,
+                        lastAttemptAt INTEGER,
+                        nextAttemptAt INTEGER
+                    )
+                """.trimIndent())
+
+                // Create indices for sync_queue table
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_sync_queue_entityType ON sync_queue (entityType)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_sync_queue_status ON sync_queue (status)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_sync_queue_createdAt ON sync_queue (createdAt)")
+            }
+        }
+
+        /**
          * All database migrations
          * Add new migrations here as schema evolves
          */
@@ -240,6 +273,7 @@ abstract class OdooDatabase : RoomDatabase() {
             MIGRATION_7_8,
             MIGRATION_8_9,
             MIGRATION_9_10,
+            MIGRATION_10_11,
         )
     }
 }

@@ -3,6 +3,7 @@ package com.odoo.fieldapp.presentation
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
@@ -16,13 +17,16 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.odoo.fieldapp.presentation.components.OfflineIndicator
 import com.odoo.fieldapp.presentation.navigation.AppNavigation
 import com.odoo.fieldapp.presentation.navigation.Screen
 import com.odoo.fieldapp.ui.theme.OdooFieldAppTheme
@@ -84,10 +88,15 @@ class MainActivity : ComponentActivity() {
  * Main screen with bottom navigation
  */
 @Composable
-fun MainScreen() {
+fun MainScreen(
+    appViewModel: AppViewModel = hiltViewModel()
+) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
+
+    // Observe connectivity state
+    val isOnline by appViewModel.isOnline.collectAsState()
 
     // Bottom navigation items
     val bottomNavItems = listOf(
@@ -108,6 +117,10 @@ fun MainScreen() {
     )
 
     Scaffold(
+        topBar = {
+            // Show offline indicator at the very top when offline
+            OfflineIndicator(isOffline = !isOnline)
+        },
         bottomBar = {
             if (showBottomNav) {
                 NavigationBar {

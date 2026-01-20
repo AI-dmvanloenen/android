@@ -125,7 +125,7 @@ class DeliveryRepositoryImpl @Inject constructor(
         // 2. Get API key
         val apiKey = apiKeyProvider.getApiKey()
         if (apiKey.isNullOrBlank()) {
-            emit(Resource.Error("API key not configured. Please add your API key in settings."))
+            emit(Resource.Error("API key not configured. Please add your API key in settings.", data = localWithLines))
             return@flow
         }
 
@@ -169,7 +169,7 @@ class DeliveryRepositoryImpl @Inject constructor(
             // 10. Emit success
             emit(Resource.Success(enrichedDeliveries))
         } else {
-            // API error
+            // API error - return cached data
             val errorMessage = when (response.code()) {
                 401 -> "Authentication failed. Please check your API key."
                 403 -> "Access denied. Your API key doesn't have permission."
@@ -177,13 +177,18 @@ class DeliveryRepositoryImpl @Inject constructor(
                 500 -> "Odoo server error. Please try again later."
                 else -> "Failed to sync deliveries: ${response.message()}"
             }
-            emit(Resource.Error(errorMessage))
+            emit(Resource.Error(errorMessage, data = localWithLines))
         }
     }.catch { e ->
         // Log the full exception for debugging
         Log.e(TAG, "Delivery sync failed", e)
 
-        // Network or other error
+        // Network or other error - return cached data
+        val cachedDeliveries = deliveryDao.getAllDeliveriesOnce()
+        val cachedData = cachedDeliveries.map { entity ->
+            val lines = deliveryLineDao.getLinesForDeliveryOnce(entity.id)
+            entity.toDomain(lines.map { it.toDomain() })
+        }
         val errorMessage = when {
             e.message?.contains("Unable to resolve host") == true ->
                 "Network error. Please check your internet connection."
@@ -192,7 +197,7 @@ class DeliveryRepositoryImpl @Inject constructor(
             else ->
                 "Sync failed: ${e.message ?: "Unknown error"}"
         }
-        emit(Resource.Error(errorMessage))
+        emit(Resource.Error(errorMessage, data = cachedData))
     }
 
     /**

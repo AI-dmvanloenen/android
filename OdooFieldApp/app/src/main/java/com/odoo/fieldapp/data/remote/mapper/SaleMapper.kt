@@ -1,5 +1,7 @@
 package com.odoo.fieldapp.data.remote.mapper
 
+import android.util.Log
+import com.odoo.fieldapp.data.remote.dto.SaleLineRequest
 import com.odoo.fieldapp.data.remote.dto.SaleLineResponse
 import com.odoo.fieldapp.data.remote.dto.SaleRequest
 import com.odoo.fieldapp.data.remote.dto.SaleResponse
@@ -8,6 +10,8 @@ import com.odoo.fieldapp.domain.model.SaleLine
 import com.odoo.fieldapp.domain.model.SyncState
 import java.text.SimpleDateFormat
 import java.util.*
+
+private const val TAG = "SaleMapper"
 
 /**
  * Thread-safe date formatters for Odoo API (ISO format: 2025-04-11 or 2025-04-11 10:30:00)
@@ -79,14 +83,34 @@ private fun parseDate(dateStr: String?): Date? {
 }
 
 /**
+ * Convert domain SaleLine model to SaleLineRequest for API
+ */
+fun SaleLine.toRequest(): SaleLineRequest {
+    return SaleLineRequest(
+        productId = productId ?: 0,
+        productUomQty = productUomQty,
+        priceUnit = priceUnit
+    )
+}
+
+/**
  * Convert domain Sale model to SaleRequest for API
  */
 fun Sale.toRequest(): SaleRequest {
+    val validLines = lines.filter { line ->
+        val isValid = line.productId != null && line.productId > 0
+        if (!isValid && lines.isNotEmpty()) {
+            Log.w(TAG, "Filtering out line with invalid productId: ${line.productName} (productId=${line.productId})")
+        }
+        isValid
+    }.map { it.toRequest() }
+
     return SaleRequest(
         mobileUid = mobileUid,
         name = name,
         dateOrder = dateOrder?.let { dateFormatter.get()!!.format(it) },
         amountTotal = amountTotal,
-        partnerId = partnerId
+        partnerId = partnerId,
+        lines = validLines.takeIf { it.isNotEmpty() }
     )
 }

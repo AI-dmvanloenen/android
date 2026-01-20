@@ -71,7 +71,21 @@ data class SaleResponse(
 )
 
 /**
- * Request payload for creating sales (future use)
+ * Request payload for sale order lines when creating a sale
+ */
+data class SaleLineRequest(
+    @SerializedName("product_id")
+    val productId: Int,
+
+    @SerializedName("product_uom_qty")
+    val productUomQty: Double,
+
+    @SerializedName("price_unit")
+    val priceUnit: Double?
+)
+
+/**
+ * Request payload for creating sales
  */
 data class SaleRequest(
     @SerializedName("mobile_uid")
@@ -87,7 +101,10 @@ data class SaleRequest(
     val amountTotal: Double?,
 
     @SerializedName("partner_id")
-    val partnerId: Int?
+    val partnerId: Int?,
+
+    @SerializedName("lines")
+    val lines: List<SaleLineRequest>?
 )
 
 /**
@@ -105,4 +122,15 @@ data class SalePaginatedResponse(
 
     @SerializedName("offset")
     val offset: Int
+)
+
+/**
+ * Response wrapper for sale creation endpoint
+ */
+data class SaleCreateResponse(
+    @SerializedName("count")
+    val count: Int,
+
+    @SerializedName("data")
+    val data: List<SaleResponse>
 )

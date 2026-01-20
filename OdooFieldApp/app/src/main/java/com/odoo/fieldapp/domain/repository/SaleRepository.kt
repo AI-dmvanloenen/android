@@ -39,4 +39,12 @@ interface SaleRepository {
      * @return Resource wrapper with loading/success/error states
      */
     suspend fun syncSalesFromOdoo(): Flow<Resource<List<Sale>>>
+
+    /**
+     * Create a new sale order and sync to Odoo
+     *
+     * @param sale The sale to create (id will be ignored, mobileUid will be generated)
+     * @return Flow emitting Loading, then Success (with created sale including Odoo ID) or Error
+     */
+    suspend fun createSale(sale: Sale): Flow<Resource<Sale>>
 }

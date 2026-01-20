@@ -8,13 +8,17 @@ import com.odoo.fieldapp.data.local.entity.toDomain
 import com.odoo.fieldapp.data.local.entity.toEntity
 import com.odoo.fieldapp.data.remote.api.OdooApiService
 import com.odoo.fieldapp.data.remote.mapper.toDomain
+import com.odoo.fieldapp.data.remote.mapper.toRequest
 import com.odoo.fieldapp.domain.model.Resource
 import com.odoo.fieldapp.domain.model.Sale
+import com.odoo.fieldapp.domain.model.SyncState
 import com.odoo.fieldapp.domain.repository.SaleRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import java.util.Date
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -93,7 +97,8 @@ class SaleRepositoryImpl @Inject constructor(
         // 2. Get API key
         val apiKey = apiKeyProvider.getApiKey()
         if (apiKey.isNullOrBlank()) {
-            emit(Resource.Error("API key not configured. Please add your API key in settings."))
+            val cachedData = localSales.map { it.toDomain() }
+            emit(Resource.Error("API key not configured. Please add your API key in settings.", data = cachedData))
             return@flow
         }
 
@@ -112,13 +117,8 @@ class SaleRepositoryImpl @Inject constructor(
 
             // 6. Convert API responses to domain models
             val sales = validResponses.map { it.toDomain() }
-
-            // Debug: Log how many lines were received from API
             val totalApiLines = sales.sumOf { it.lines.size }
-            Log.d(TAG, "API returned ${sales.size} sales with $totalApiLines total lines")
-            sales.forEach { sale ->
-                Log.d(TAG, "Sale ${sale.name} (id=${sale.id}) has ${sale.lines.size} lines from API")
-            }
+            Log.d(TAG, "Fetched ${sales.size} sales with $totalApiLines lines from API")
 
             // 7. Resolve partner names from local database
             val enrichedSales = sales.map { sale ->
@@ -131,26 +131,21 @@ class SaleRepositoryImpl @Inject constructor(
             // 8. Save sales to local database (full replace)
             val entities = enrichedSales.map { it.toEntity() }
             saleDao.syncSales(entities)
-            Log.d(TAG, "Synced ${entities.size} sales")
 
             // 9. Sync order lines for each sale
             var totalLines = 0
             for (sale in enrichedSales) {
                 val lineEntities = sale.lines.map { it.toEntity(sale.id) }
-                Log.d(TAG, "Saving ${lineEntities.size} lines for sale ${sale.name} (id=${sale.id})")
                 saleLineDao.syncLinesForSale(sale.id, lineEntities)
                 totalLines += lineEntities.size
-
-                // Verify lines were saved
-                val savedLines = saleLineDao.getLinesForSaleOnce(sale.id)
-                Log.d(TAG, "Verified ${savedLines.size} lines saved for sale ${sale.name}")
             }
-            Log.d(TAG, "Synced $totalLines sale lines total")
+            Log.d(TAG, "Synced ${entities.size} sales with $totalLines lines")
 
             // 10. Emit success
             emit(Resource.Success(enrichedSales))
         } else {
-            // API error
+            // API error - return cached data
+            val cachedData = localSales.map { it.toDomain() }
             val errorMessage = when (response.code()) {
                 401 -> "Authentication failed. Please check your API key."
                 403 -> "Access denied. Your API key doesn't have permission."
@@ -158,13 +153,14 @@ class SaleRepositoryImpl @Inject constructor(
                 500 -> "Odoo server error. Please try again later."
                 else -> "Failed to sync sales: ${response.message()}"
             }
-            emit(Resource.Error(errorMessage))
+            emit(Resource.Error(errorMessage, data = cachedData))
         }
     }.catch { e ->
         // Log the full exception for debugging
         Log.e(TAG, "Sale sync failed", e)
 
-        // Network or other error
+        // Network or other error - return cached data
+        val cachedData = saleDao.getAllSalesOnce().map { it.toDomain() }
         val errorMessage = when {
             e.message?.contains("Unable to resolve host") == true ->
                 "Network error. Please check your internet connection."
@@ -172,6 +168,117 @@ class SaleRepositoryImpl @Inject constructor(
                 "Request timed out. Please try again."
             else ->
                 "Sync failed: ${e.message ?: "Unknown error"}"
+        }
+        emit(Resource.Error(errorMessage, data = cachedData))
+    }
+
+    /**
+     * Create a new sale order and sync to Odoo
+     *
+     * Flow:
+     * 1. Generate UUID for mobileUid
+     * 2. Save locally with temporary negative ID and syncState = PENDING
+     * 3. Call API with Bearer token
+     * 4. On success: update local record with Odoo ID, set SYNCED
+     * 5. On failure: keep PENDING for retry, emit error
+     */
+    override suspend fun createSale(sale: Sale): Flow<Resource<Sale>> = flow {
+        // 1. Emit loading
+        emit(Resource.Loading())
+
+        // 2. Generate UUID for mobileUid
+        val mobileUid = UUID.randomUUID().toString()
+
+        // 3. Generate temporary negative ID for local storage
+        val minId = saleDao.getMinSaleId() ?: 0
+        val tempId = if (minId >= 0) -1 else minId - 1
+
+        // 4. Resolve partner name for local display
+        val partnerName = sale.partnerId?.let { customerId ->
+            customerDao.getCustomerById(customerId)?.name
+        }
+
+        // 5. Create sale with PENDING state
+        val pendingSale = sale.copy(
+            id = tempId,
+            mobileUid = mobileUid,
+            partnerName = partnerName,
+            syncState = SyncState.PENDING,
+            lastModified = Date()
+        )
+
+        // 6. Save locally (both sale and lines)
+        saleDao.insertSale(pendingSale.toEntity())
+        if (pendingSale.lines.isNotEmpty()) {
+            val lineEntities = pendingSale.lines.mapIndexed { index, line ->
+                // Use negative IDs for local lines to avoid conflicts with Odoo IDs
+                line.copy(id = tempId * 1000 - index).toEntity(tempId)
+            }
+            saleLineDao.insertLines(lineEntities)
+        }
+        Log.d(TAG, "Sale saved locally with tempId=$tempId, mobileUid=$mobileUid, lines=${pendingSale.lines.size}")
+
+        // 7. Get API key
+        val apiKey = apiKeyProvider.getApiKey()
+        if (apiKey.isNullOrBlank()) {
+            emit(Resource.Error("API key not configured. Sale saved locally.", data = pendingSale))
+            return@flow
+        }
+
+        // 8. Call API to create sale
+        val request = pendingSale.toRequest()
+        val response = apiService.createSales(apiKey, listOf(request))
+
+        if (response.isSuccessful) {
+            val createResponse = response.body()
+            val createdSale = createResponse?.data?.firstOrNull { it.mobileUid == mobileUid }
+
+            if (createdSale != null && createdSale.id != null) {
+                // 9. Success: Update local record with Odoo ID
+                val syncedSale = createdSale.toDomain().copy(
+                    partnerName = partnerName,
+                    syncState = SyncState.SYNCED
+                )
+
+                // Delete the temp record (CASCADE will remove lines too) and insert with real ID
+                saleDao.deleteSaleById(tempId)
+                saleDao.insertSale(syncedSale.toEntity())
+
+                // Save the synced lines with real Odoo IDs
+                if (syncedSale.lines.isNotEmpty()) {
+                    val lineEntities = syncedSale.lines.map { it.toEntity(syncedSale.id) }
+                    saleLineDao.insertLines(lineEntities)
+                }
+
+                Log.d(TAG, "Sale synced successfully, odooId=${syncedSale.id}, lines=${syncedSale.lines.size}")
+                emit(Resource.Success(syncedSale))
+            } else {
+                // API returned success but no matching sale
+                Log.w(TAG, "API response didn't include created sale")
+                emit(Resource.Error("Sale created but response incomplete", data = pendingSale))
+            }
+        } else {
+            // API error - sale remains in PENDING state
+            val errorMessage = when (response.code()) {
+                401 -> "Authentication failed. Please check your API key."
+                403 -> "Access denied. Your API key doesn't have permission."
+                404 -> "Endpoint not found. Please check the base URL."
+                500 -> "Odoo server error. Please try again later."
+                else -> "Failed to sync: ${response.message()}"
+            }
+            Log.e(TAG, "Sale creation API failed: $errorMessage")
+            emit(Resource.Error(errorMessage, data = pendingSale))
+        }
+    }.catch { e ->
+        Log.e(TAG, "Sale creation failed", e)
+
+        val errorMessage = when {
+            e.message?.contains("Unable to resolve host") == true ->
+                "Network error. Sale saved locally."
+            e.message?.contains("timeout") == true ->
+                "Request timed out. Sale saved locally."
+            else ->
+                "Creation failed: ${e.message ?: "Unknown error"}"
         }
         emit(Resource.Error(errorMessage))
     }

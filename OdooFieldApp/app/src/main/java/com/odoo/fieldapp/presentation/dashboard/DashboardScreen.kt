@@ -19,6 +19,7 @@ import com.odoo.fieldapp.R
 import com.odoo.fieldapp.domain.model.DashboardStats
 import com.odoo.fieldapp.domain.model.Resource
 import com.odoo.fieldapp.presentation.components.ErrorBanner
+import com.odoo.fieldapp.presentation.components.LastSyncIndicator
 import com.odoo.fieldapp.presentation.components.SuccessBanner
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
@@ -34,11 +35,14 @@ import java.util.*
 fun DashboardScreen(
     stats: DashboardStats,
     syncState: Resource<Unit>?,
+    pendingSyncCount: Int,
+    lastSyncTime: Date?,
     onDeliveriesClick: () -> Unit,
     onPaymentsClick: () -> Unit,
     onSyncErrorsClick: () -> Unit,
     onCreatePaymentClick: () -> Unit,
     onCreateCustomerClick: () -> Unit,
+    onCreateSaleClick: () -> Unit,
     onSyncAllClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onClearSyncState: () -> Unit
@@ -85,7 +89,15 @@ fun DashboardScreen(
             // Greeting header
             GreetingHeader()
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Last sync indicator
+            LastSyncIndicator(
+                lastSyncTime = lastSyncTime,
+                pendingSyncCount = pendingSyncCount
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Auto-dismiss success messages after 3 seconds
             LaunchedEffect(syncState) {
@@ -131,7 +143,8 @@ fun DashboardScreen(
             // Quick actions section
             QuickActionsSection(
                 onCreatePaymentClick = onCreatePaymentClick,
-                onCreateCustomerClick = onCreateCustomerClick
+                onCreateCustomerClick = onCreateCustomerClick,
+                onCreateSaleClick = onCreateSaleClick
             )
         }
     }
@@ -312,7 +325,8 @@ private fun ActionCard(
 @Composable
 private fun QuickActionsSection(
     onCreatePaymentClick: () -> Unit,
-    onCreateCustomerClick: () -> Unit
+    onCreateCustomerClick: () -> Unit,
+    onCreateSaleClick: () -> Unit
 ) {
     Text(
         text = "Quick Actions",
@@ -322,16 +336,30 @@ private fun QuickActionsSection(
 
     Spacer(modifier = Modifier.height(12.dp))
 
-    Row(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         OutlinedButton(
-            onClick = onCreatePaymentClick,
-            modifier = Modifier.weight(1f)
+            onClick = onCreateSaleClick,
+            modifier = Modifier.fillMaxWidth(0.5f)
         ) {
             Icon(
-                Icons.Default.Add,
+                Icons.Default.ShoppingCart,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text("Sale")
+        }
+
+        OutlinedButton(
+            onClick = onCreatePaymentClick,
+            modifier = Modifier.fillMaxWidth(0.5f)
+        ) {
+            Icon(
+                Icons.Default.AttachMoney,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp)
             )
@@ -341,7 +369,7 @@ private fun QuickActionsSection(
 
         OutlinedButton(
             onClick = onCreateCustomerClick,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.fillMaxWidth(0.5f)
         ) {
             Icon(
                 Icons.Default.PersonAdd,

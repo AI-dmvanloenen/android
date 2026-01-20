@@ -23,7 +23,7 @@ PRODUCT_FILTERS = {
 
 class ProductController(http.Controller):
 
-    @http.route('/products', type='http', auth='none', methods=['GET'], cors='*', csrf=False)
+    @http.route(['/products', '/api/v1/products'], type='http', auth='none', methods=['GET'], cors='*', csrf=False)
     def get_products(self):
         # Rate limiting
         allowed, error = check_rate_limit()

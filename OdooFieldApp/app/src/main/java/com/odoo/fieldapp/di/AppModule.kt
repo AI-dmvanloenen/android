@@ -5,14 +5,17 @@ import androidx.room.Room
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.odoo.fieldapp.BuildConfig
+import com.odoo.fieldapp.data.connectivity.ConnectivityManagerNetworkMonitor
 import com.odoo.fieldapp.data.local.OdooDatabase
 import com.odoo.fieldapp.data.local.dao.CustomerDao
+import com.odoo.fieldapp.domain.connectivity.NetworkMonitor
 import com.odoo.fieldapp.data.local.dao.DeliveryDao
 import com.odoo.fieldapp.data.local.dao.DeliveryLineDao
 import com.odoo.fieldapp.data.local.dao.PaymentDao
 import com.odoo.fieldapp.data.local.dao.ProductDao
 import com.odoo.fieldapp.data.local.dao.SaleDao
 import com.odoo.fieldapp.data.local.dao.SaleLineDao
+import com.odoo.fieldapp.data.local.dao.SyncQueueDao
 import com.odoo.fieldapp.data.remote.DynamicBaseUrlInterceptor
 import com.odoo.fieldapp.data.remote.api.OdooApiService
 import com.odoo.fieldapp.data.repository.ApiKeyProvider
@@ -296,7 +299,8 @@ object AppModule {
         customerRepository: CustomerRepository,
         saleRepository: SaleRepository,
         deliveryRepository: DeliveryRepository,
-        paymentRepository: PaymentRepository
+        paymentRepository: PaymentRepository,
+        productRepository: ProductRepository
     ): DashboardRepository {
         return DashboardRepositoryImpl(
             deliveryDao,
@@ -306,7 +310,8 @@ object AppModule {
             customerRepository,
             saleRepository,
             deliveryRepository,
-            paymentRepository
+            paymentRepository,
+            productRepository
         )
     }
 
@@ -330,5 +335,25 @@ object AppModule {
         apiKeyProvider: ApiKeyProvider
     ): ProductRepository {
         return ProductRepositoryImpl(productDao, apiService, apiKeyProvider)
+    }
+
+    /**
+     * Provide NetworkMonitor
+     * Monitors device connectivity state for offline-first functionality
+     */
+    @Provides
+    @Singleton
+    fun provideNetworkMonitor(@ApplicationContext context: Context): NetworkMonitor {
+        return ConnectivityManagerNetworkMonitor(context)
+    }
+
+    /**
+     * Provide SyncQueue DAO
+     * Used for managing offline operations queue
+     */
+    @Provides
+    @Singleton
+    fun provideSyncQueueDao(database: OdooDatabase): SyncQueueDao {
+        return database.syncQueueDao()
     }
 }

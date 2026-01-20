@@ -11,6 +11,7 @@ import com.odoo.fieldapp.domain.repository.CustomerRepository
 import com.odoo.fieldapp.domain.repository.DashboardRepository
 import com.odoo.fieldapp.domain.repository.DeliveryRepository
 import com.odoo.fieldapp.domain.repository.PaymentRepository
+import com.odoo.fieldapp.domain.repository.ProductRepository
 import com.odoo.fieldapp.domain.repository.SaleRepository
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -37,7 +38,8 @@ class DashboardRepositoryImpl @Inject constructor(
     private val customerRepository: CustomerRepository,
     private val saleRepository: SaleRepository,
     private val deliveryRepository: DeliveryRepository,
-    private val paymentRepository: PaymentRepository
+    private val paymentRepository: PaymentRepository,
+    private val productRepository: ProductRepository
 ) : DashboardRepository {
 
     companion object {
@@ -107,12 +109,16 @@ class DashboardRepositoryImpl @Inject constructor(
                 val paymentDeferred = async {
                     paymentRepository.syncPaymentsFromOdoo().first { it !is Resource.Loading }
                 }
+                val productDeferred = async {
+                    productRepository.syncProductsFromOdoo().first { it !is Resource.Loading }
+                }
 
                 // Await all results
                 val customerResult = customerDeferred.await()
                 val saleResult = saleDeferred.await()
                 val deliveryResult = deliveryDeferred.await()
                 val paymentResult = paymentDeferred.await()
+                val productResult = productDeferred.await()
 
                 // Check for errors
                 val errors = mutableListOf<String>()
@@ -120,6 +126,7 @@ class DashboardRepositoryImpl @Inject constructor(
                 if (saleResult is Resource.Error) errors.add("Sales: ${saleResult.message}")
                 if (deliveryResult is Resource.Error) errors.add("Deliveries: ${deliveryResult.message}")
                 if (paymentResult is Resource.Error) errors.add("Payments: ${paymentResult.message}")
+                if (productResult is Resource.Error) errors.add("Products: ${productResult.message}")
 
                 if (errors.isNotEmpty()) {
                     Log.e(TAG, "Sync completed with errors: $errors")

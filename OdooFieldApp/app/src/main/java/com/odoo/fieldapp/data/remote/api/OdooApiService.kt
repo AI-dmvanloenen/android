@@ -8,7 +8,9 @@ import com.odoo.fieldapp.data.remote.dto.PaymentCreateResponse
 import com.odoo.fieldapp.data.remote.dto.PaymentPaginatedResponse
 import com.odoo.fieldapp.data.remote.dto.PaymentRequest
 import com.odoo.fieldapp.data.remote.dto.ProductPaginatedResponse
+import com.odoo.fieldapp.data.remote.dto.SaleCreateResponse
 import com.odoo.fieldapp.data.remote.dto.SalePaginatedResponse
+import com.odoo.fieldapp.data.remote.dto.SaleRequest
 import com.odoo.fieldapp.data.remote.dto.ValidateDeliveryRequest
 import com.odoo.fieldapp.data.remote.dto.ValidateDeliveryResponse
 import retrofit2.Response
@@ -58,6 +60,18 @@ interface OdooApiService {
         @Header("Authorization") apiKey: String,
         @Query("since") since: String? = null
     ): Response<SalePaginatedResponse>
+
+    /**
+     * Create new sales in Odoo (batch operation)
+     * POST /sales
+     *
+     * Accepts a list of sales in the request body
+     */
+    @POST("sales")
+    suspend fun createSales(
+        @Header("Authorization") apiKey: String,
+        @Body sales: List<SaleRequest>
+    ): Response<SaleCreateResponse>
 
     /**
      * Fetch all deliveries from Odoo

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Android API',
-    'version': '18.0.12.0.0',
+    'version': '18.0.14.0.0',
     'category': 'Technical',
     'summary': 'REST API endpoints for Android app integration',
     'description': """
@@ -14,6 +14,7 @@
         - POST /sales - Create/update sale orders in batch (upsert by mobile_uid)
         - GET /deliveries - Fetch outgoing deliveries with lines
         - POST /payments - Create/update customer payments (upsert by mobile_uid)
+        - GET /products - Fetch saleable products with filtering and pagination
 
         ## Features
         - API key authentication (Bearer token or raw key)

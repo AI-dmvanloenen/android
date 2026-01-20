@@ -40,6 +40,7 @@ fun SaleListScreen(
     onClearSearch: () -> Unit,
     onSyncClick: () -> Unit,
     onSaleClick: (Sale) -> Unit,
+    onCreateClick: () -> Unit,
     onClearSyncState: () -> Unit
 ) {
     val isRefreshing = syncState is Resource.Loading
@@ -52,54 +53,66 @@ fun SaleListScreen(
         }
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        // Search bar with sync button
-        AppSearchBar(
-            query = searchQuery,
-            onQueryChange = onSearchQueryChange,
-            onClearClick = onClearSearch,
-            placeholder = "Search sales...",
-            onSyncClick = onSyncClick,
-            isSyncing = isRefreshing,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        )
-
-        // Sync state messages
-        syncState?.let { state ->
-            when (state) {
-                is Resource.Success -> {
-                    SuccessBanner(
-                        message = if ((state.data?.size ?: 0) == 0) "There is nothing new to sync" else "Synced ${state.data?.size} sales",
-                        onDismiss = onClearSyncState
-                    )
-                }
-                is Resource.Error -> {
-                    ErrorBanner(
-                        message = state.message ?: "Sync failed",
-                        onDismiss = onClearSyncState
-                    )
-                }
-                is Resource.Loading -> {
-                    // Loading indicator shown via pull-to-refresh
-                }
+    Scaffold(
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = onCreateClick
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Create Sale Order")
             }
         }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            // Search bar with sync button
+            AppSearchBar(
+                query = searchQuery,
+                onQueryChange = onSearchQueryChange,
+                onClearClick = onClearSearch,
+                placeholder = "Search sales...",
+                onSyncClick = onSyncClick,
+                isSyncing = isRefreshing,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            )
 
-        // Sales list or empty state
-        if (sales.isEmpty()) {
-            SaleEmptyState(
-                searchQuery = searchQuery,
-                onSyncClick = onSyncClick
-            )
-        } else {
-            SaleList(
-                sales = sales,
-                onSaleClick = onSaleClick
-            )
+            // Sync state messages
+            syncState?.let { state ->
+                when (state) {
+                    is Resource.Success -> {
+                        SuccessBanner(
+                            message = if ((state.data?.size ?: 0) == 0) "There is nothing new to sync" else "Synced ${state.data?.size} sales",
+                            onDismiss = onClearSyncState
+                        )
+                    }
+                    is Resource.Error -> {
+                        ErrorBanner(
+                            message = state.message ?: "Sync failed",
+                            onDismiss = onClearSyncState
+                        )
+                    }
+                    is Resource.Loading -> {
+                        // Loading indicator shown via pull-to-refresh
+                    }
+                }
+            }
+
+            // Sales list or empty state
+            if (sales.isEmpty()) {
+                SaleEmptyState(
+                    searchQuery = searchQuery,
+                    onSyncClick = onSyncClick
+                )
+            } else {
+                SaleList(
+                    sales = sales,
+                    onSaleClick = onSaleClick
+                )
+            }
         }
     }
 }
@@ -134,8 +147,8 @@ fun SaleListItem(
     sale: Sale,
     onClick: () -> Unit
 ) {
-    val dateFormatter = remember { SimpleDateFormat("MMM dd, yyyy", Locale.US) }
-    val currencyFormatter = remember { NumberFormat.getCurrencyInstance(Locale.US) }
+    val dateFormatter = remember { SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()) }
+    val currencyFormatter = remember { NumberFormat.getCurrencyInstance(Locale.getDefault()) }
 
     Card(
         modifier = Modifier
