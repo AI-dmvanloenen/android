@@ -15,7 +15,7 @@ _logger = logging.getLogger(__name__)
 # Allowed filters for GET endpoint
 PRODUCT_FILTERS = {
     'category_id': ('categ_id', 'int'),
-    'type': ('detailed_type', 'str'),
+    'type': ('type', 'str'),
     'active': ('active', 'bool'),
     'since': ('write_date', 'datetime'),  # Records modified since
 }
@@ -75,6 +75,6 @@ class ProductController(http.Controller):
             'uom_name': product.uom_id.name if product.uom_id else None,
             'categ_id': product.categ_id.id if product.categ_id else None,
             'categ_name': product.categ_id.name if product.categ_id else None,
-            'type': product.detailed_type or 'consu',  # consu, service, product
+            'type': product.type or 'consu',  # consu, service, product
             'active': product.active,
         }
